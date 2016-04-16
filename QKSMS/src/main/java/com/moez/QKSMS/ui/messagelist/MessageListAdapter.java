@@ -1,12 +1,12 @@
 package com.moez.QKSMS.ui.messagelist;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.PorterDuff;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Handler;
 import android.provider.ContactsContract;
 import android.provider.Telephony;
@@ -27,15 +27,19 @@ import com.android.mms.transaction.TransactionService;
 import com.android.mms.util.DownloadManager;
 import com.google.android.mms.ContentType;
 import com.google.android.mms.pdu_alt.PduHeaders;
+import com.koushikdutta.ion.Ion;
 import com.moez.QKSMS.QKSMSApp;
 import com.moez.QKSMS.R;
-import com.moez.QKSMS.data.Contact;
+import com.moez.QKSMS.common.LiveViewManager;
 import com.moez.QKSMS.common.emoji.EmojiRegistry;
 import com.moez.QKSMS.common.utils.CursorUtils;
+import com.moez.QKSMS.common.utils.LinkifyUtils;
 import com.moez.QKSMS.common.utils.MessageUtils;
+import com.moez.QKSMS.data.Contact;
+import com.moez.QKSMS.enums.QKPreference;
 import com.moez.QKSMS.transaction.SmsHelper;
-import com.moez.QKSMS.ui.MainActivity;
 import com.moez.QKSMS.ui.ThemeManager;
+import com.moez.QKSMS.ui.base.QKActivity;
 import com.moez.QKSMS.ui.base.RecyclerCursorAdapter;
 import com.moez.QKSMS.ui.mms.MmsThumbnailPresenter;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
@@ -50,14 +54,15 @@ import java.util.regex.Pattern;
 public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHolder, MessageItem> {
     private final String TAG = "MessageListAdapter";
 
-    public static final int INCOMING_ITEM_TYPE_SMS = 0;
-    public static final int OUTGOING_ITEM_TYPE_SMS = 1;
-    public static final int INCOMING_ITEM_TYPE_MMS = 2;
-    public static final int OUTGOING_ITEM_TYPE_MMS = 3;
+    public static final int INCOMING_ITEM = 0;
+    public static final int OUTGOING_ITEM = 1;
 
     private ArrayList<Long> mSelectedConversations = new ArrayList<>();
 
-    private Context mContext;
+    private static final Pattern urlPattern = Pattern.compile(
+            "\\b(https?:\\/\\/\\S+(?:png|jpe?g|gif)\\S*)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL);
+
     private MessageItemCache mMessageItemCache;
     private MessageColumns.ColumnsMap mColumnsMap;
 
@@ -72,10 +77,10 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
     private Handler mMessageListItemHandler = null; // TODO this isn't quite the same as the others
     private String mSelection = null;
 
-    public MessageListAdapter(Context context) {
-        mContext = context;
-        mRes = MainActivity.getRes(mContext);
-        mPrefs = MainActivity.getPrefs(mContext);
+    public MessageListAdapter(QKActivity context) {
+        super(context);
+        mRes = mContext.getResources();
+        mPrefs = mContext.getPrefs();
     }
 
     protected MessageItem getItem(int position) {
@@ -115,7 +120,7 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
         int resource;
         boolean sent;
 
-        if (viewType == INCOMING_ITEM_TYPE_SMS || viewType == INCOMING_ITEM_TYPE_MMS) {
+        if (viewType == INCOMING_ITEM) {
             resource = R.layout.list_item_message_in;
             sent = false;
         } else {
@@ -128,14 +133,14 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
     }
 
     private MessageListViewHolder setupViewHolder(View view, boolean sent) {
-        MessageListViewHolder holder = new MessageListViewHolder(view);
+        MessageListViewHolder holder = new MessageListViewHolder(mContext, view);
 
         if (sent) {
             // set up colors
-            holder.mBodyTextView.setOnColorBackground(ThemeManager.getSentBubbleColor() == ThemeManager.getColor());
+            holder.mBodyTextView.setOnColorBackground(ThemeManager.getSentBubbleColor() != ThemeManager.getNeutralBubbleColor());
             holder.mDateView.setOnColorBackground(false);
-            holder.mDeliveredIndicator.setColorFilter(ThemeManager.getTextOnBackgroundSecondary(), PorterDuff.Mode.MULTIPLY);
-            holder.mLockedIndicator.setColorFilter(ThemeManager.getTextOnBackgroundSecondary(), PorterDuff.Mode.MULTIPLY);
+            holder.mDeliveredIndicator.setColorFilter(ThemeManager.getTextOnBackgroundSecondary(), PorterDuff.Mode.SRC_ATOP);
+            holder.mLockedIndicator.setColorFilter(ThemeManager.getTextOnBackgroundSecondary(), PorterDuff.Mode.SRC_ATOP);
 
             // set up avatar
             holder.mAvatarView.setImageDrawable(Contact.getMe(true).getAvatar(mContext, null));
@@ -147,10 +152,10 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
             }
         } else {
             // set up colors
-            holder.mBodyTextView.setOnColorBackground(ThemeManager.getReceivedBubbleColor() == ThemeManager.getColor());
+            holder.mBodyTextView.setOnColorBackground(ThemeManager.getReceivedBubbleColor() != ThemeManager.getNeutralBubbleColor());
             holder.mDateView.setOnColorBackground(false);
-            holder.mDeliveredIndicator.setColorFilter(ThemeManager.getTextOnBackgroundSecondary(), PorterDuff.Mode.MULTIPLY);
-            holder.mLockedIndicator.setColorFilter(ThemeManager.getTextOnBackgroundSecondary(), PorterDuff.Mode.MULTIPLY);
+            holder.mDeliveredIndicator.setColorFilter(ThemeManager.getTextOnBackgroundSecondary(), PorterDuff.Mode.SRC_ATOP);
+            holder.mLockedIndicator.setColorFilter(ThemeManager.getTextOnBackgroundSecondary(), PorterDuff.Mode.SRC_ATOP);
 
             // set up avatar
             if (mPrefs.getBoolean(SettingsFragment.HIDE_AVATAR_RECEIVED, false)) {
@@ -159,6 +164,10 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
             }
         }
 
+        LiveViewManager.registerView(QKPreference.BACKGROUND, this, key -> {
+            holder.mMmsView.getForeground().setColorFilter(ThemeManager.getBackgroundColor(), PorterDuff.Mode.SRC_ATOP);
+        });
+
         return holder;
     }
 
@@ -166,9 +175,9 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
     public void onBindViewHolder(MessageListViewHolder holder, int position) {
         MessageItem messageItem = getItem(position);
 
-        holder.data = messageItem;
-        holder.context = mContext;
-        holder.clickListener = mItemClickListener;
+        holder.mData = messageItem;
+        holder.mContext = mContext;
+        holder.mClickListener = mItemClickListener;
         holder.mRoot.setOnClickListener(holder);
         holder.mRoot.setOnLongClickListener(holder);
         holder.mPresenter = null;
@@ -184,13 +193,13 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
         boolean pduLoaded = messageItem.isSms() || messageItem.mSlideshow != null;
 
         bindGrouping(holder, messageItem);
-        bindBody(holder, messageItem);
         bindTimestamp(holder, messageItem);
 
         if (pduLoaded) {
             bindAvatar(holder, messageItem);
         }
         bindMmsView(holder, messageItem);
+        bindBody(holder, messageItem);
         bindIndicators(holder, messageItem);
         bindVcard(holder, messageItem);
 
@@ -282,6 +291,13 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
             int MAX_DURATION = 60 * 60 * 1000;
             MessageItem messageItem2 = getItem(position + 1);
             showTimestamp = messageItem2.mDate - messageItem.mDate >= MAX_DURATION;
+
+
+            if (messageItem.mAddress != null && messageItem2.mAddress != null &&
+                    !messageItem.mAddress.equals(messageItem2.mAddress) &&
+                    !messageItem.isOutgoingMessage() && !messageItem2.isOutgoingMessage()) {
+                showTimestamp = true;
+            }
         }
 
         if (position == 0) {
@@ -290,19 +306,30 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
             int MAX_DURATION = 60 * 60 * 1000;
             MessageItem messageItem2 = getItem(position - 1);
             showAvatar = messageItem.getBoxId() != messageItem2.getBoxId() || messageItem.mDate - messageItem2.mDate >= MAX_DURATION;
+
+            // If the messages are from different people, then we don't care about any of the other checks,
+            // we need to show the avatar/timestamp. This is used for group chats, which is why we want
+            // both to be incoming messages
+            if (messageItem.mAddress != null && messageItem2.mAddress != null &&
+                    !messageItem.mAddress.equals(messageItem2.mAddress) &&
+                    !messageItem.isOutgoingMessage() && !messageItem2.isOutgoingMessage()) {
+                showAvatar = true;
+            }
         }
 
-        holder.mDateView.setVisibility(showTimestamp? View.VISIBLE : View.GONE);
+        holder.mDateView.setVisibility(showTimestamp ? View.VISIBLE : View.GONE);
         holder.mSpace.setVisibility(showAvatar ? View.VISIBLE : View.GONE);
         holder.mBodyTextView.setBackgroundResource(showAvatar ? (messageItem.isMe() ? ThemeManager.getSentBubbleRes() :
                 ThemeManager.getReceivedBubbleRes()) : (messageItem.isMe() ?
                 ThemeManager.getSentBubbleAltRes() : ThemeManager.getReceivedBubbleAltRes()));
 
-        if (messageItem.isMe()) {
-            holder.mBodyTextView.getBackground().setColorFilter(ThemeManager.getSentBubbleColor(), PorterDuff.Mode.MULTIPLY);
-        } else {
-            holder.mBodyTextView.getBackground().setColorFilter(ThemeManager.getReceivedBubbleColor(), PorterDuff.Mode.MULTIPLY);
-        }
+        holder.setLiveViewCallback(key -> {
+            if (messageItem.isMe()) {
+                holder.mBodyTextView.getBackground().setColorFilter(ThemeManager.getSentBubbleColor(), PorterDuff.Mode.SRC_ATOP);
+            } else {
+                holder.mBodyTextView.getBackground().setColorFilter(ThemeManager.getReceivedBubbleColor(), PorterDuff.Mode.SRC_ATOP);
+            }
+        });
 
         if (messageItem.isMe() && !mPrefs.getBoolean(SettingsFragment.HIDE_AVATAR_SENT, true)) {
             holder.mAvatarView.setVisibility(showAvatar ? View.VISIBLE : View.GONE);
@@ -312,6 +339,7 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
     }
 
     private void bindBody(MessageListViewHolder holder, MessageItem messageItem) {
+        holder.mBodyTextView.setAutoLinkMask(0);
         SpannableStringBuilder buf = new SpannableStringBuilder();
 
         String body = messageItem.mBody;
@@ -346,7 +374,27 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
             }
         }
 
-        holder.mBodyTextView.setText(buf);
+        if (!TextUtils.isEmpty(buf)) {
+            holder.mBodyTextView.setText(buf);
+            Matcher matcher = urlPattern.matcher(holder.mBodyTextView.getText());
+            if (matcher.find()) { //only find the image to the first link
+                int matchStart = matcher.start(1);
+                int matchEnd = matcher.end();
+                String imageUrl = buf.subSequence(matchStart, matchEnd).toString();
+                Ion.with(mContext).load(imageUrl).withBitmap().asBitmap().setCallback((e, result) -> {
+                    try {
+                        holder.setImage("url_img" + holder.getItemId(), result);
+                        holder.mImageView.setOnClickListener(v -> {
+                            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(imageUrl));
+                            mContext.startActivity(i);
+                        });
+                    } catch (NullPointerException imageException) {
+                        imageException.printStackTrace();
+                    }
+                });
+            }
+            LinkifyUtils.addLinks(holder.mBodyTextView);
+        }
         holder.mBodyTextView.setVisibility(TextUtils.isEmpty(buf) ? View.GONE : View.VISIBLE);
     }
 
@@ -403,15 +451,20 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
             }
 
             if (messageItem.mSlideshow == null) {
-                messageItem.setOnPduLoaded(new MessageItem.PduLoadedCallback() {
-                    public void onPduLoaded(MessageItem messageItem) {
-                        if (messageItem != null && messageItem.getMessageId() == messageItem.getMessageId()) {
-                            messageItem.setCachedFormattedMessage(null);
-                            bindBody(holder, messageItem);
-                            bindTimestamp(holder, messageItem);
-                            bindMmsView(holder, messageItem);
-                            bindAvatar(holder, messageItem);
-                        }
+                messageItem.setOnPduLoaded(messageItem1 -> {
+                    if (mCursor == null) {
+                        // The pdu has probably loaded after shutting down the fragment. Don't try to bind anything now
+                        return;
+                    }
+                    if (messageItem1 != null && messageItem1.getMessageId() == messageItem1.getMessageId()) {
+                        messageItem1.setCachedFormattedMessage(null);
+                        bindGrouping(holder, messageItem);
+                        bindBody(holder, messageItem);
+                        bindTimestamp(holder, messageItem);
+                        bindAvatar(holder, messageItem);
+                        bindMmsView(holder, messageItem);
+                        bindIndicators(holder, messageItem);
+                        bindVcard(holder, messageItem);
                     }
                 });
             } else {
@@ -532,15 +585,15 @@ public class MessageListAdapter extends RecyclerCursorAdapter<MessageListViewHol
 
         if (item.isSms()) {
             if (boxId == TextBasedSmsColumns.MESSAGE_TYPE_INBOX || boxId == TextBasedSmsColumns.MESSAGE_TYPE_ALL) {
-                return INCOMING_ITEM_TYPE_SMS;
+                return INCOMING_ITEM;
             } else {
-                return OUTGOING_ITEM_TYPE_SMS;
+                return OUTGOING_ITEM;
             }
         } else {
             if (boxId == Telephony.Mms.MESSAGE_BOX_ALL || boxId == Telephony.Mms.MESSAGE_BOX_INBOX) {
-                return INCOMING_ITEM_TYPE_MMS;
+                return INCOMING_ITEM;
             } else {
-                return OUTGOING_ITEM_TYPE_MMS;
+                return OUTGOING_ITEM;
             }
         }
     }

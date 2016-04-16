@@ -1,23 +1,17 @@
 package com.moez.QKSMS.ui.messagelist;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.LoaderManager;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.ContentResolver;
 import android.content.ContentUris;
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.CursorLoader;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.Loader;
-import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SqliteWrapper;
-import android.drm.DrmStore;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -25,8 +19,7 @@ import android.hardware.SensorManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Environment;
-import android.provider.ContactsContract;
+import android.os.Vibrator;
 import android.provider.Telephony;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -41,52 +34,47 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.webkit.MimeTypeMap;
 import android.widget.AdapterView;
 import android.widget.Toast;
 import com.google.android.mms.ContentType;
-import com.google.android.mms.MmsException;
-import com.google.android.mms.pdu_alt.PduBody;
-import com.google.android.mms.pdu_alt.PduPart;
 import com.moez.QKSMS.LogTag;
 import com.moez.QKSMS.MmsConfig;
 import com.moez.QKSMS.QKSMSApp;
 import com.moez.QKSMS.R;
+import com.moez.QKSMS.common.CIELChEvaluator;
+import com.moez.QKSMS.common.ConversationPrefsHelper;
+import com.moez.QKSMS.common.DialogHelper;
+import com.moez.QKSMS.common.LiveViewManager;
+import com.moez.QKSMS.ui.dialog.conversationdetails.ConversationDetailsDialog;
+import com.moez.QKSMS.enums.QKPreference;
+import com.moez.QKSMS.common.utils.KeyboardUtils;
+import com.moez.QKSMS.common.utils.MessageUtils;
+import com.moez.QKSMS.common.vcard.ContactOperations;
 import com.moez.QKSMS.data.Contact;
 import com.moez.QKSMS.data.ContactList;
 import com.moez.QKSMS.data.Conversation;
 import com.moez.QKSMS.data.ConversationLegacy;
 import com.moez.QKSMS.data.Message;
 import com.moez.QKSMS.interfaces.ActivityLauncher;
-import com.moez.QKSMS.model.SlideshowModel;
-import com.moez.QKSMS.common.DialogHelper;
-import com.moez.QKSMS.common.conversationdetails.ConversationDetailsDialog;
-import com.moez.QKSMS.common.utils.DrmUtils;
-import com.moez.QKSMS.common.utils.KeyboardUtils;
-import com.moez.QKSMS.common.utils.MessageUtils;
-import com.moez.QKSMS.common.vcard.ContactOperations;
 import com.moez.QKSMS.transaction.NotificationManager;
 import com.moez.QKSMS.transaction.SmsHelper;
 import com.moez.QKSMS.ui.MainActivity;
+import com.moez.QKSMS.ui.ThemeManager;
 import com.moez.QKSMS.ui.base.QKContentFragment;
 import com.moez.QKSMS.ui.base.RecyclerCursorAdapter;
 import com.moez.QKSMS.ui.delivery.DeliveryReportHelper;
 import com.moez.QKSMS.ui.delivery.DeliveryReportItem;
 import com.moez.QKSMS.ui.dialog.AsyncDialog;
+import com.moez.QKSMS.ui.dialog.ConversationSettingsDialog;
 import com.moez.QKSMS.ui.dialog.QKDialog;
-import com.moez.QKSMS.ui.popup.QKComposeActivity;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
 import com.moez.QKSMS.ui.view.ComposeView;
 import com.moez.QKSMS.ui.view.MessageListRecyclerView;
 import com.moez.QKSMS.ui.view.SmoothLinearLayoutManager;
+import com.moez.QKSMS.ui.widget.WidgetProvider;
 import ezvcard.Ezvcard;
 import ezvcard.VCard;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -97,60 +85,32 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
 
     private final String TAG = "MessageListFragment";
 
-    private final static boolean LOCAL_LOGV = false;
-
-    private final int REQUEST_CODE_IMAGE = 6639;
-
     private static final int MESSAGE_LIST_QUERY_TOKEN = 9527;
     private static final int MESSAGE_LIST_QUERY_AFTER_DELETE_TOKEN = 9528;
     private static final int DELETE_MESSAGE_TOKEN = 9700;
 
-    // Menu ID
-    private static final int MENU_ADD_SUBJECT           = 0;
-    private static final int MENU_DELETE_THREAD         = 1;
-    private static final int MENU_ADD_ATTACHMENT        = 2;
-    private static final int MENU_DISCARD               = 3;
-    private static final int MENU_SEND                  = 4;
-    private static final int MENU_CALL_RECIPIENT        = 5;
-    private static final int MENU_CONVERSATION_LIST     = 6;
-    private static final int MENU_DEBUG_DUMP            = 7;
-
-    // Context menu ID
-    private static final int MENU_VIEW_CONTACT          = 12;
-    private static final int MENU_ADD_TO_CONTACTS       = 13;
-
-    private static final int MENU_EDIT_MESSAGE          = 14;
-    private static final int MENU_VIEW_SLIDESHOW        = 16;
-    private static final int MENU_VIEW_MESSAGE_DETAILS  = 17;
-    private static final int MENU_DELETE_MESSAGE        = 18;
-    private static final int MENU_SEARCH                = 19;
-    private static final int MENU_DELIVERY_REPORT       = 20;
-    private static final int MENU_FORWARD_MESSAGE       = 21;
-    private static final int MENU_CALL_BACK             = 22;
-    private static final int MENU_SEND_EMAIL            = 23;
-    private static final int MENU_COPY_MESSAGE_TEXT     = 24;
-    private static final int MENU_COPY_TO_SDCARD        = 25;
+    private static final int MENU_EDIT_MESSAGE = 14;
+    private static final int MENU_VIEW_SLIDESHOW = 16;
+    private static final int MENU_VIEW_MESSAGE_DETAILS = 17;
+    private static final int MENU_DELETE_MESSAGE = 18;
+    private static final int MENU_SEARCH = 19;
+    private static final int MENU_DELIVERY_REPORT = 20;
+    private static final int MENU_FORWARD_MESSAGE = 21;
+    private static final int MENU_CALL_BACK = 22;
+    private static final int MENU_SEND_EMAIL = 23;
+    private static final int MENU_COPY_MESSAGE_TEXT = 24;
+    private static final int MENU_COPY_TO_SDCARD = 25;
     private static final int MENU_ADD_ADDRESS_TO_CONTACTS = 27;
-    private static final int MENU_LOCK_MESSAGE          = 28;
-    private static final int MENU_UNLOCK_MESSAGE        = 29;
-    private static final int MENU_SAVE_RINGTONE         = 30;
-    private static final int MENU_PREFERENCES           = 31;
-    private static final int MENU_GROUP_PARTICIPANTS    = 32;
+    private static final int MENU_LOCK_MESSAGE = 28;
+    private static final int MENU_UNLOCK_MESSAGE = 29;
+    private static final int MENU_SAVE_RINGTONE = 30;
+    private static final int MENU_PREFERENCES = 31;
+    private static final int MENU_GROUP_PARTICIPANTS = 32;
 
-    // When the conversation has a lot of messages and a new message is sent, the list is scrolled
-    // so the user sees the just sent message. If we have to scroll the list more than 20 items,
-    // then a scroll shortcut is invoked to move the list near the end before scrolling.
-    private static final int MAX_ITEMS_TO_INVOKE_SCROLL_SHORTCUT = 20;
-
-    // Any change in height in the message list view greater than this threshold will not
-    // cause a smooth scroll. Instead, we jump the list directly to the desired position.
-    private static final int SMOOTH_SCROLL_THRESHOLD = 200;
-
-    // Whether or not we are currently enabled for SMS. This field is updated in onStart to make
-    // sure we notice if the user has changed the default SMS app.
     private boolean mIsSmsEnabled;
 
     private Cursor mCursor;
+    private CIELChEvaluator mCIELChEvaluator;
     private MessageListAdapter mAdapter;
     private SmoothLinearLayoutManager mLayoutManager;
     private MessageListRecyclerView mRecyclerView;
@@ -162,7 +122,7 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
     private SensorManager mSensorManager;
     private AsyncDialog mAsyncDialog;
     private ComposeView mComposeView;
-    private SharedPreferences mPrefs;
+    private ConversationPrefsHelper mConversationPrefs;
     private ConversationDetailsDialog mConversationDetailsDialog;
 
     private int mSavedScrollPosition = -1;  // we save the ListView's scroll position in onPause(),
@@ -173,7 +133,7 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
     private long mLastMessageId;
     private BackgroundQueryHandler mBackgroundQueryHandler;
 
-    public static final String ARG_THREAD_ID = "threadId";
+    public static final String ARG_THREAD_ID = "thread_id";
     public static final String ARG_ROW_ID = "rowId";
     public static final String ARG_HIGHLIGHT = "highlight";
     public static final String ARG_SHOW_IMMEDIATE = "showImmediate";
@@ -183,13 +143,22 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
     private String mHighlight;
     private boolean mShowImmediate;
 
-    public static MessageListFragment getInstance(Bundle args) {
-        MessageListFragment fragment = new MessageListFragment();
+    protected static MessageListFragment getInstance(long threadId, long rowId, String highlight, boolean showImmediate) {
 
-        // Update the fragment with the new arguments.
+        Bundle args = new Bundle();
+        args.putLong(ARG_THREAD_ID, threadId);
+        args.putLong(ARG_ROW_ID, rowId);
+        args.putString(ARG_HIGHLIGHT, highlight);
+        args.putBoolean(ARG_SHOW_IMMEDIATE, showImmediate);
+
+        MessageListFragment fragment = new MessageListFragment();
         fragment.updateArguments(args);
 
         return fragment;
+    }
+
+    public MessageListFragment() {
+
     }
 
     @Override
@@ -203,27 +172,24 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
             mShowImmediate = savedInstanceState.getBoolean(ARG_SHOW_IMMEDIATE, false);
         }
 
-        mPrefs = MainActivity.getPrefs(mContext);
+        mConversationPrefs = new ConversationPrefsHelper(mContext, mThreadId);
         mIsSmsEnabled = MmsConfig.isSmsEnabled(mContext);
         mConversationDetailsDialog = new ConversationDetailsDialog(mContext, getFragmentManager());
         setHasOptionsMenu(true);
 
+        LiveViewManager.registerView(QKPreference.CONVERSATION_THEME, this, key -> {
+            mCIELChEvaluator = new CIELChEvaluator(mConversationPrefs.getColor(), ThemeManager.getThemeColor());
+        });
+
+
         mSensorManager = (SensorManager) mContext.getSystemService(Context.SENSOR_SERVICE);
         mProxSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
 
-        if (mPrefs.getBoolean(SettingsFragment.PROXIMITY_CALLING, false)) {
+        if (mContext.getBoolean(QKPreference.PROXIMITY_SENSOR)) {
             mSensorManager.registerListener(this, mProxSensor, SensorManager.SENSOR_DELAY_NORMAL);
         }
 
         mBackgroundQueryHandler = new BackgroundQueryHandler(mContext.getContentResolver());
-    }
-
-    @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
-
-        // Make sure to notify that this conversation has been opened. This will mark it as read, load new drafts, etc.
-        onOpenConversation();
     }
 
     // This is called by BaseContentFragment when updateArguments is called.
@@ -246,6 +212,8 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
 
         View view = inflater.inflate(R.layout.fragment_conversation, container, false);
         mRecyclerView = (MessageListRecyclerView) view.findViewById(R.id.conversation);
+
+        mOpened = true; // TODO
 
         mAdapter = new MessageListAdapter(mContext);
         mAdapter.setItemClickListener(this);
@@ -290,11 +258,6 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
     }
 
     @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-        super.onCreateOptionsMenu(menu, inflater);
-    }
-
-    @Override
     public void onResume() {
         super.onResume();
 
@@ -303,6 +266,13 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
         // perform initialization such as set up the Conversation object, make a query in the
         // adapter, etc.
         loadFromArguments();
+        onOpenConversation();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mComposeView.saveDraft();
     }
 
     @Override
@@ -320,15 +290,14 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
     /**
      * To be called when the user opens a conversation. Initializes the Conversation objects, sets
      * up the draft, and marks the conversation as read.
-     * <p/>
+     * <p>
      * Note: This will have no effect if the context has not been initialized yet.
      */
     private void onOpenConversation() {
-        Log.d(TAG, "onOpenConversation with threadId: " + mThreadId);
-        new LoadConversationTask().execute((Void[]) null);
+        new LoadConversationTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, null);
     }
 
-    public void setTitle() {
+    private void setTitle() {
         if (mContext != null && mConversation != null) {
             mContext.setTitle(mConversation.getRecipients().formatNames(", "));
         }
@@ -337,7 +306,7 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
     @Override
     public void onItemClick(final MessageItem messageItem, View view) {
         if (mAdapter.isInMultiSelectMode()) {
-            mAdapter.toggleSelection(messageItem.getMessageId());
+            mAdapter.toggleSelection(messageItem.getMessageId(), messageItem);
         } else {
             if (view.getId() == R.id.image_view || view.getId() == R.id.play_slideshow_button) {
                 switch (messageItem.mAttachmentType) {
@@ -358,7 +327,7 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
                                         MessageUtils.viewMmsMessageAttachment(getActivity(), messageItem.mMessageUri, messageItem.mSlideshow, getAsyncDialog());
                                     }
                                 })
-                                .show(getFragmentManager(), null);
+                                .show();
                         break;
                 }
             } else if (messageItem != null && messageItem.isOutgoingMessage() && messageItem.isFailedMessage()) {
@@ -395,7 +364,7 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
         addCallAndContactMenuItems(dialog, messageItem);
 
         // Forward is not available for undownloaded messages.
-        if (messageItem.isDownloaded() && (messageItem.isSms() || isForwardable(messageItem.getMessageId())) && mIsSmsEnabled) {
+        if (messageItem.isDownloaded() && (messageItem.isSms() || MessageUtils.isForwardable(mContext, messageItem.getMessageId())) && mIsSmsEnabled) {
             dialog.addMenuItem(R.string.menu_forward, MENU_FORWARD_MESSAGE);
         }
 
@@ -417,18 +386,18 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
                     break;
                 case SmsHelper.VIDEO:
                 case SmsHelper.IMAGE:
-                    if (haveSomethingToCopyToSDCard(messageItem.mMsgId)) {
+                    if (MessageUtils.haveSomethingToCopyToSDCard(mContext, messageItem.mMsgId)) {
                         dialog.addMenuItem(R.string.copy_to_sdcard, MENU_COPY_TO_SDCARD);
                     }
                     break;
                 case SmsHelper.SLIDESHOW:
                 default:
                     dialog.addMenuItem(R.string.view_slideshow, MENU_VIEW_SLIDESHOW);
-                    if (haveSomethingToCopyToSDCard(messageItem.mMsgId)) {
+                    if (MessageUtils.haveSomethingToCopyToSDCard(mContext, messageItem.mMsgId)) {
                         dialog.addMenuItem(R.string.copy_to_sdcard, MENU_COPY_TO_SDCARD);
                     }
-                    if (isDrmRingtoneWithRights(messageItem.mMsgId)) {
-                        dialog.addMenuItem(getDrmMimeMenuStringRsrc(messageItem.mMsgId), MENU_SAVE_RINGTONE);
+                    if (MessageUtils.isDrmRingtoneWithRights(mContext, messageItem.mMsgId)) {
+                        dialog.addMenuItem(MessageUtils.getDrmMimeMenuStringRsrc(mContext, messageItem.mMsgId), MENU_SAVE_RINGTONE);
                     }
                     break;
             }
@@ -451,7 +420,7 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
         }
 
         dialog.buildMenu(l);
-        dialog.show(getFragmentManager(), "messagelistitem options");
+        dialog.show();
     }
 
     private void addCallAndContactMenuItems(QKDialog dialog, MessageItem msgItem) {
@@ -477,9 +446,9 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
             Uri contactUri = null;
             boolean knownPrefix = true;
             if ("mailto".equalsIgnoreCase(prefix)) {
-                contactUri = getContactUriForEmail(uriString);
+                contactUri = MessageUtils.getContactUriForEmail(mContext, uriString);
             } else if ("tel".equalsIgnoreCase(prefix)) {
-                contactUri = getContactUriForPhoneNumber(uriString);
+                contactUri = MessageUtils.getContactUriForPhoneNumber(uriString);
             } else {
                 knownPrefix = false;
             }
@@ -492,119 +461,8 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
         }
     }
 
-    private Uri getContactUriForEmail(String emailAddress) {
-        Cursor cursor = SqliteWrapper.query(mContext, mContext.getContentResolver(),
-                Uri.withAppendedPath(ContactsContract.CommonDataKinds.Email.CONTENT_LOOKUP_URI, Uri.encode(emailAddress)),
-                new String[]{ContactsContract.CommonDataKinds.Email.CONTACT_ID, ContactsContract.Contacts.DISPLAY_NAME}, null, null, null);
-
-        if (cursor != null) {
-            try {
-                while (cursor.moveToNext()) {
-                    String name = cursor.getString(1);
-                    if (!TextUtils.isEmpty(name)) {
-                        return ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, cursor.getLong(0));
-                    }
-                }
-            } finally {
-                cursor.close();
-            }
-        }
-        return null;
-    }
-
-    private Uri getContactUriForPhoneNumber(String phoneNumber) {
-        Contact contact = Contact.get(phoneNumber, false);
-        if (contact.existsInDatabase()) {
-            return contact.getUri();
-        }
-        return null;
-    }
-
-    /**
-     * Returns true if all drm'd parts are forwardable.
-     *
-     * @param msgId
-     * @return true if all drm'd parts are forwardable.
-     */
-    private boolean isForwardable(long msgId) {
-        PduBody body = null;
-        try {
-            body = SlideshowModel.getPduBody(mContext, ContentUris.withAppendedId(Telephony.Mms.CONTENT_URI, msgId));
-        } catch (MmsException e) {
-            Log.e(TAG, "getDrmMimeType can't load pdu body: " + msgId);
-        }
-        if (body == null) {
-            return false;
-        }
-
-        int partNum = body.getPartsNum();
-        for (int i = 0; i < partNum; i++) {
-            PduPart part = body.getPart(i);
-            String type = new String(part.getContentType());
-
-            if (DrmUtils.isDrmType(type) && !DrmUtils.haveRightsForAction(part.getDataUri(),
-                    DrmStore.Action.TRANSFER)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private ContactList getRecipients() {
-        // If the recipients editor is visible, the conversation has
-        // not really officially 'started' yet.  Recipients will be set
-        // on the conversation once it has been saved or sent.  In the
-        // meantime, let anyone who needs the recipient list think it
-        // is empty rather than giving them a stale one.
-        /*if (isRecipientsEditorVisible()) {
-            if (sEmptyContactList == null) {
-                sEmptyContactList = new ContactList();
-            }
-            return sEmptyContactList;
-        }*/
         return mConversation.getRecipients();
-    }
-
-    /**
-     * Looks to see if there are any valid parts of the attachment that can be copied to a SD card.
-     *
-     * @param msgId
-     */
-    private boolean haveSomethingToCopyToSDCard(long msgId) {
-        PduBody body = null;
-        try {
-            body = SlideshowModel.getPduBody(mContext, ContentUris.withAppendedId(Telephony.Mms.CONTENT_URI, msgId));
-        } catch (MmsException e) {
-            Log.e(TAG, "haveSomethingToCopyToSDCard can't load pdu body: " + msgId);
-        }
-        if (body == null) {
-            return false;
-        }
-
-        boolean result = false;
-        int partNum = body.getPartsNum();
-        for (int i = 0; i < partNum; i++) {
-            PduPart part = body.getPart(i);
-            String type = new String(part.getContentType());
-
-            if (Log.isLoggable(LogTag.APP, Log.VERBOSE)) {
-                Log.v(TAG, "[CMA] haveSomethingToCopyToSDCard: part[" + i + "] contentType=" + type);
-            }
-
-            if (ContentType.isImageType(type) || ContentType.isVideoType(type) ||
-                    ContentType.isAudioType(type) || DrmUtils.isDrmType(type)) {
-                result = true;
-                break;
-            }
-        }
-        return result;
-    }
-
-    private int getDrmMimeMenuStringRsrc(long msgId) {
-        if (isDrmRingtoneWithRights(msgId)) {
-            return R.string.save_ringtone;
-        }
-        return 0;
     }
 
     AsyncDialog getAsyncDialog() {
@@ -620,11 +478,27 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
             case R.id.menu_call:
                 makeCall();
                 return true;
-            case R.id.menu_delete_conversation:
-                DialogHelper.showDeleteConversationDialog(mContext, mThreadId);
+
+            case R.id.menu_notifications:
+                ConversationPrefsHelper conversationPrefs = new ConversationPrefsHelper(mContext, mThreadId);
+                boolean notificationMuted = conversationPrefs.getNotificationsEnabled();
+                conversationPrefs.putBoolean(SettingsFragment.NOTIFICATIONS, !notificationMuted);
+                mContext.invalidateOptionsMenu();
+                vibrateOnConversationStateChanged(notificationMuted);
                 return true;
+
             case R.id.menu_details:
                 mConversationDetailsDialog.showDetails(mConversation);
+                return true;
+
+            case R.id.menu_notification_settings:
+                ConversationSettingsDialog.newInstance(mThreadId, mConversation.getRecipients().formatNames(", "))
+                        .setContext(mContext)
+                        .show();
+                return true;
+
+            case R.id.menu_delete_conversation:
+                DialogHelper.showDeleteConversationDialog((MainActivity) mContext, mThreadId);
                 return true;
         }
         return super.onOptionsItemSelected(item);
@@ -636,12 +510,12 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
         startActivity(openDialerIntent);
     }
 
-    @Override
-    public void onPause() {
-        super.onPause();
-
-        // Save the draft. This should also clear the EditText.
-        mComposeView.saveDraft();
+    private void vibrateOnConversationStateChanged(final boolean notificationMuted) {
+        final int vibrateTime = 70;
+        Toast.makeText(getActivity(), notificationMuted ?
+                R.string.notification_mute_off : R.string.notification_mute_on, Toast.LENGTH_SHORT).show();
+        Vibrator v = (Vibrator) getActivity().getSystemService(Context.VIBRATOR_SERVICE);
+        v.vibrate(vibrateTime);
     }
 
     /**
@@ -656,7 +530,7 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
     /**
      * Should only be called for failed messages. Deletes the message, placing the text from the
      * message back in the edit box to be updated and then sent.
-     * <p/>
+     * <p>
      * Assumes that cursor points to the correct MessageItem.
      *
      * @param msgItem
@@ -723,28 +597,32 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
     }
 
     @Override
-    protected void onContentOpening() {
+    public void onContentOpening() {
         super.onContentOpening();
         mOpened = false; // We're animating the fragment in, this flag warns us not to do anything heavy
     }
 
     @Override
-    protected void onContentOpened() {
+    public void onContentOpened() {
         super.onContentOpened();
         mOpened = true; // The fragment has finished animating in
 
-        if (mPrefs != null && mPrefs.getBoolean(SettingsFragment.PROXIMITY_CALLING, false)) {
+        if (mContext.getBoolean(QKPreference.PROXIMITY_SENSOR)) {
             mSensorManager.registerListener(this, mProxSensor, SensorManager.SENSOR_DELAY_NORMAL);
         }
+
+        ThemeManager.setActiveColor(mConversationPrefs.getColor());
     }
 
     @Override
-    protected void onContentClosing() {
+    public void onContentClosing() {
     }
 
     @Override
-    protected void onContentClosed() {
-        mSensorManager.unregisterListener(this);
+    public void onContentClosed() {
+        if (mSensorManager != null) {
+            mSensorManager.unregisterListener(this);
+        }
 
         if (mOpened) {
             if (mConversationLegacy != null) {
@@ -757,11 +635,34 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
                 mComposeView.saveDraft();
             }
         }
+
+        ThemeManager.setActiveColor(ThemeManager.getThemeColor());
+    }
+
+    @Override
+    public void onMenuChanging(float percentOpen) {
+        if (mConversationPrefs != null) {
+            ThemeManager.setActiveColor(mCIELChEvaluator.evaluate(percentOpen));
+        }
+    }
+
+    @Override
+    public void inflateToolbar(Menu menu, MenuInflater inflater, Context context) {
+        inflater.inflate(R.menu.message_list, menu);
+        setTitle();
+
+        ConversationPrefsHelper conversationPrefs = new ConversationPrefsHelper(context, mThreadId);
+        menu.findItem(R.id.menu_notifications).setTitle(conversationPrefs.getNotificationsEnabled() ?
+                R.string.menu_notifications : R.string.menu_notifications_off);
+        menu.findItem(R.id.menu_notifications).setIcon(conversationPrefs.getNotificationsEnabled() ?
+                R.drawable.ic_notifications : R.drawable.ic_notifications_muted);
+
+        super.onCreateOptionsMenu(menu, inflater);
     }
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.values[0] == 0) {
+        if (event.values[0] == 0 && isAdded()) {
             makeCall();
         }
     }
@@ -792,6 +693,16 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
 
     @Override
     public void onMultiSelectStateChanged(boolean enabled) {
+
+    }
+
+    @Override
+    public void onItemAdded(long id) {
+
+    }
+
+    @Override
+    public void onItemRemoved(long id) {
 
     }
 
@@ -831,11 +742,11 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
                     break;
 
                 case MENU_COPY_MESSAGE_TEXT:
-                    copyToClipboard(mMsgItem.mBody);
+                    MessageUtils.copyToClipboard(mContext, mMsgItem.mBody);
                     break;
 
                 case MENU_FORWARD_MESSAGE:
-                    forwardMessage(mMsgItem);
+                    MessageUtils.forwardMessage(mContext, mMsgItem);
                     break;
 
                 case MENU_VIEW_SLIDESHOW:
@@ -856,69 +767,30 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
                     break;
 
                 case MENU_COPY_TO_SDCARD: {
-                    int resId = copyMedia(mMsgItem.mMsgId) ? R.string.copy_to_sdcard_success : R.string.copy_to_sdcard_fail;
+                    int resId = MessageUtils.copyMedia(mContext, mMsgItem.mMsgId) ? R.string.copy_to_sdcard_success : R.string.copy_to_sdcard_fail;
                     Toast.makeText(mContext, resId, Toast.LENGTH_SHORT).show();
                     break;
                 }
 
                 case MENU_SAVE_RINGTONE: {
-                    int resId = getDrmMimeSavedStringRsrc(mMsgItem.mMsgId, saveRingtone(mMsgItem.mMsgId));
+                    int resId = MessageUtils.getDrmMimeSavedStringRsrc(mContext, mMsgItem.mMsgId, MessageUtils.saveRingtone(mContext, mMsgItem.mMsgId));
                     Toast.makeText(mContext, resId, Toast.LENGTH_SHORT).show();
                     break;
                 }
 
                 case MENU_ADD_ADDRESS_TO_CONTACTS:
-                    addToContacts(mMsgItem);
+                    MessageUtils.addToContacts(mContext, mMsgItem);
                     break;
 
                 case MENU_LOCK_MESSAGE:
-                    lockMessage(mMsgItem, true);
+                    MessageUtils.lockMessage(mContext, mMsgItem, true);
                     break;
 
                 case MENU_UNLOCK_MESSAGE:
-                    lockMessage(mMsgItem, false);
+                    MessageUtils.lockMessage(mContext, mMsgItem, false);
                     break;
             }
         }
-    }
-
-    private void addToContacts(MessageItem msgItem) {
-        Intent intent = new Intent(Intent.ACTION_INSERT);
-        intent.setType(ContactsContract.Contacts.CONTENT_TYPE);
-        intent.putExtra(ContactsContract.Intents.Insert.PHONE, msgItem.mAddress);
-        mContext.startActivity(intent);
-    }
-
-    private void copyToClipboard(String str) {
-        ClipboardManager clipboard = (ClipboardManager) mContext.getSystemService(Context.CLIPBOARD_SERVICE);
-        clipboard.setPrimaryClip(ClipData.newPlainText(null, str));
-    }
-
-    private void forwardMessage(MessageItem msgItem) {
-        Intent forwardIntent = new Intent(mContext, QKComposeActivity.class);
-        forwardIntent.putExtra("sms_body", msgItem.mBody);
-        startActivity(forwardIntent);
-    }
-
-    private void lockMessage(MessageItem msgItem, boolean locked) {
-        Uri uri;
-        if ("sms".equals(msgItem.mType)) {
-            uri = Telephony.Sms.CONTENT_URI;
-        } else {
-            uri = Telephony.Mms.CONTENT_URI;
-        }
-        final Uri lockUri = ContentUris.withAppendedId(uri, msgItem.mMsgId);
-
-        final ContentValues values = new ContentValues(1);
-        values.put("locked", locked ? 1 : 0);
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                mContext.getContentResolver().update(lockUri,
-                        values, null, null);
-            }
-        }, "MainActivity.lockMessage").start();
     }
 
     private boolean showMessageResendOptions(final MessageItem msgItem) {
@@ -932,24 +804,21 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
         new QKDialog()
                 .setContext(mContext)
                 .setTitle(R.string.failed_message_title)
-                .setItems(R.array.resend_menu, new AdapterView.OnItemClickListener() {
-                    @Override
-                    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                        switch (position) {
-                            case 0: // Resend message
-                                resendMessageItem(msgItem);
+                .setItems(R.array.resend_menu, (parent, view, position, id) -> {
+                    switch (position) {
+                        case 0: // Resend message
+                            resendMessageItem(msgItem);
 
-                                break;
-                            case 1: // Edit message
-                                editMessageItem(msgItem);
+                            break;
+                        case 1: // Edit message
+                            editMessageItem(msgItem);
 
-                                break;
-                            case 2: // Delete message
-                                confirmDeleteDialog(new DeleteMessageListener(msgItem), false);
-                                break;
-                        }
+                            break;
+                        case 2: // Delete message
+                            confirmDeleteDialog(new DeleteMessageListener(msgItem), false);
+                            break;
                     }
-                }).show(getFragmentManager(), QKDialog.LIST_TAG);
+                }).show();
         return true;
     }
 
@@ -977,7 +846,7 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
                 .setTitle(R.string.message_details_title)
                 .setMessage(messageDetails)
                 .setCancelOnTouchOutside(true)
-                .show(getFragmentManager(), QKDialog.DETAILS_TAG);
+                .show();
         return true;
     }
 
@@ -1014,226 +883,7 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
                 .setTitle(R.string.delivery_header_title)
                 .setItems(items, null)
                 .setPositiveButton(R.string.okay, null)
-                .show(getFragmentManager(), "delivery report");
-    }
-
-    /**
-     * Copies media from an Mms to the "download" directory on the SD card. If any of the parts
-     * are audio types, drm'd or not, they're copied to the "Ringtones" directory.
-     *
-     * @param msgId
-     */
-    private boolean copyMedia(long msgId) {
-        boolean result = true;
-        PduBody body = null;
-        try {
-            body = SlideshowModel.getPduBody(mContext, ContentUris.withAppendedId(Telephony.Mms.CONTENT_URI, msgId));
-        } catch (MmsException e) {
-            Log.e(TAG, "copyMedia can't load pdu body: " + msgId);
-        }
-        if (body == null) {
-            return false;
-        }
-
-        int partNum = body.getPartsNum();
-        for (int i = 0; i < partNum; i++) {
-            PduPart part = body.getPart(i);
-
-            // all parts have to be successful for a valid result.
-            result &= copyPart(part, Long.toHexString(msgId));
-        }
-        return result;
-    }
-
-    private boolean copyPart(PduPart part, String fallback) {
-        Uri uri = part.getDataUri();
-        String type = new String(part.getContentType());
-        boolean isDrm = DrmUtils.isDrmType(type);
-        if (isDrm) {
-            type = QKSMSApp.getApplication().getDrmManagerClient().getOriginalMimeType(part.getDataUri());
-        }
-        if (!ContentType.isImageType(type) && !ContentType.isVideoType(type) &&
-                !ContentType.isAudioType(type)) {
-            return true;    // we only save pictures, videos, and sounds. Skip the text parts,
-            // the app (smil) parts, and other type that we can't handle.
-            // Return true to pretend that we successfully saved the part so
-            // the whole save process will be counted a success.
-        }
-        InputStream input = null;
-        FileOutputStream fout = null;
-        try {
-            input = mContext.getContentResolver().openInputStream(uri);
-            if (input instanceof FileInputStream) {
-                FileInputStream fin = (FileInputStream) input;
-
-                byte[] location = part.getName();
-                if (location == null) {
-                    location = part.getFilename();
-                }
-                if (location == null) {
-                    location = part.getContentLocation();
-                }
-
-                String fileName;
-                if (location == null) {
-                    // Use fallback name.
-                    fileName = fallback;
-                } else {
-                    // For locally captured videos, fileName can end up being something like this:
-                    //      /mnt/sdcard/Android/data/com.android.mms/cache/.temp1.3gp
-                    fileName = new String(location);
-                }
-                File originalFile = new File(fileName);
-                fileName = originalFile.getName();  // Strip the full path of where the "part" is
-                // stored down to just the leaf filename.
-
-                // Depending on the location, there may be an
-                // extension already on the name or not. If we've got audio, put the attachment
-                // in the Ringtones directory.
-                String dir = Environment.getExternalStorageDirectory() + "/"
-                        + (ContentType.isAudioType(type) ? Environment.DIRECTORY_RINGTONES :
-                        Environment.DIRECTORY_DOWNLOADS) + "/";
-                String extension;
-                int index;
-                if ((index = fileName.lastIndexOf('.')) == -1) {
-                    extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(type);
-                } else {
-                    extension = fileName.substring(index + 1, fileName.length());
-                    fileName = fileName.substring(0, index);
-                }
-                if (isDrm) {
-                    extension += DrmUtils.getConvertExtension(type);
-                }
-                // Remove leading periods. The gallery ignores files starting with a period.
-                fileName = fileName.replaceAll("^.", "");
-
-                File file = getUniqueDestination(dir + fileName, extension);
-
-                // make sure the path is valid and directories created for this file.
-                File parentFile = file.getParentFile();
-                if (!parentFile.exists() && !parentFile.mkdirs()) {
-                    Log.e(TAG, "[MMS] copyPart: mkdirs for " + parentFile.getPath() + " failed!");
-                    return false;
-                }
-
-                fout = new FileOutputStream(file);
-
-                byte[] buffer = new byte[8000];
-                int size = 0;
-                while ((size = fin.read(buffer)) != -1) {
-                    fout.write(buffer, 0, size);
-                }
-
-                // Notify other applications listening to scanner events
-                // that a media file has been added to the sd card
-                mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)));
-            }
-        } catch (IOException e) {
-            // Ignore
-            Log.e(TAG, "IOException caught while opening or reading stream", e);
-            return false;
-        } finally {
-            if (null != input) {
-                try {
-                    input.close();
-                } catch (IOException e) {
-                    // Ignore
-                    Log.e(TAG, "IOException caught while closing stream", e);
-                    return false;
-                }
-            }
-            if (null != fout) {
-                try {
-                    fout.close();
-                } catch (IOException e) {
-                    // Ignore
-                    Log.e(TAG, "IOException caught while closing stream", e);
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    private File getUniqueDestination(String base, String extension) {
-        File file = new File(base + "." + extension);
-
-        for (int i = 2; file.exists(); i++) {
-            file = new File(base + "_" + i + "." + extension);
-        }
-        return file;
-    }
-
-    private int getDrmMimeSavedStringRsrc(long msgId, boolean success) {
-        if (isDrmRingtoneWithRights(msgId)) {
-            return success ? R.string.saved_ringtone : R.string.saved_ringtone_fail;
-        }
-        return 0;
-    }
-
-    /**
-     * Returns true if any part is drm'd audio with ringtone rights.
-     *
-     * @param msgId
-     * @return true if one of the parts is drm'd audio with rights to save as a ringtone.
-     */
-    private boolean isDrmRingtoneWithRights(long msgId) {
-        PduBody body = null;
-        try {
-            body = SlideshowModel.getPduBody(mContext, ContentUris.withAppendedId(Telephony.Mms.CONTENT_URI, msgId));
-        } catch (MmsException e) {
-            Log.e(TAG, "isDrmRingtoneWithRights can't load pdu body: " + msgId);
-        }
-        if (body == null) {
-            return false;
-        }
-
-        int partNum = body.getPartsNum();
-        for (int i = 0; i < partNum; i++) {
-            PduPart part = body.getPart(i);
-            String type = new String(part.getContentType());
-
-            if (DrmUtils.isDrmType(type)) {
-                String mimeType = QKSMSApp.getApplication().getDrmManagerClient()
-                        .getOriginalMimeType(part.getDataUri());
-                if (ContentType.isAudioType(mimeType) && DrmUtils.haveRightsForAction(part.getDataUri(),
-                        DrmStore.Action.RINGTONE)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Copies media from an Mms to the DrmProvider
-     *
-     * @param msgId
-     */
-    private boolean saveRingtone(long msgId) {
-        boolean result = true;
-        PduBody body = null;
-        try {
-            body = SlideshowModel.getPduBody(mContext, ContentUris.withAppendedId(Telephony.Mms.CONTENT_URI, msgId));
-        } catch (MmsException e) {
-            Log.e(TAG, "copyToDrmProvider can't load pdu body: " + msgId);
-        }
-        if (body == null) {
-            return false;
-        }
-
-        int partNum = body.getPartsNum();
-        for (int i = 0; i < partNum; i++) {
-            PduPart part = body.getPart(i);
-            String type = new String(part.getContentType());
-
-            if (DrmUtils.isDrmType(type)) {
-                // All parts (but there's probably only a single one) have to be successful
-                // for a valid result.
-                result &= copyPart(part, Long.toHexString(msgId));
-            }
-        }
-        return result;
+                .show();
     }
 
     private void startMsgListQuery(int token) {
@@ -1277,7 +927,7 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
         protected void onQueryComplete(int token, Object cookie, Cursor cursor) {
             switch (token) {
                 case MainActivity.HAVE_LOCKED_MESSAGES_TOKEN:
-                    if (((MainActivity) mContext).isFinishing()) {
+                    if (mContext.isFinishing()) {
                         Log.w(TAG, "ComposeMessageActivity is finished, do nothing ");
                         if (cursor != null) {
                             cursor.close();
@@ -1334,26 +984,20 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
                         // If we just deleted the last message, reset the saved id.
                         mLastMessageId = 0;
                     }
-                    // Update the notification for new messages since they
-                    // may be deleted.
-                    //MessagingNotification.nonBlockingUpdateNewMessageIndicator(ComposeMessageActivity.this, MessagingNotification.THREAD_NONE, false);
+
+                    // Update the notification for new messages since they may be deleted.
                     NotificationManager.update(mContext);
-                    // Update the notification for failed messages since they
-                    // may be deleted.
-                    // TODO
+
+                    // TODO Update the notification for failed messages since they may be deleted.
                     //updateSendFailedNotification();
                     break;
             }
-            // If we're deleting the whole conversation, throw away
-            // our current working message and bail.
+            // If we're deleting the whole conversation, throw away our current working message and bail.
             if (token == MainActivity.DELETE_CONVERSATION_TOKEN) {
                 ContactList recipients = mConversation.getRecipients();
-                //TODO
-                //mWorkingMessage.discard();
 
-                // Remove any recipients referenced by this single thread from the
-                // contacts cache. It's possible for two or more threads to reference
-                // the same contact. That's ok if we remove it. We'll recreate that contact
+                // Remove any recipients referenced by this single thread from the It's possible for two or more
+                // threads to reference the same contact. That's ok if we remove it. We'll recreate that contact
                 // when we init all Conversations below.
                 if (recipients != null) {
                     for (Contact contact : recipients) {
@@ -1363,18 +1007,23 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
 
                 // Make sure the conversation cache reflects the threads in the DB.
                 Conversation.init(mContext);
-                mContext.showMenu();
-                //finish();
+
+                // Go back to the conversation list
+                ((MainActivity) mContext).showMenu();
             } else if (token == DELETE_MESSAGE_TOKEN) {
                 // Check to see if we just deleted the last message
                 startMsgListQuery(MESSAGE_LIST_QUERY_AFTER_DELETE_TOKEN);
             }
 
-            //MmsWidgetProvider.notifyDatasetChanged(getApplicationContext());
+            WidgetProvider.notifyDatasetChanged(mContext);
         }
     }
 
     private class LoadConversationTask extends AsyncTask<Void, Void, Void> {
+
+        public LoadConversationTask() {
+            Log.d(TAG, "LoadConversationTask");
+        }
 
         @Override
         protected Void doInBackground(Void... params) {
@@ -1386,7 +1035,24 @@ public class MessageListFragment extends QKContentFragment implements ActivityLa
             mConversation.blockMarkAsRead(true);
             mConversation.markAsRead();
 
-            while (!mOpened); // Delay the thread until the fragment has finished opening
+            // Delay the thread until the fragment has finished opening. If it waits longer than
+            // 10 seconds, then something is wrong, so cancel it. This happens when the fragment is closed before
+            // it opens, or the screen is rotated, and then "mOpened" never gets changed to true,
+            // leaving this thread running forever. This issue is actually what caused the great
+            // QKSMS battery drain of 2015
+            long time = System.currentTimeMillis();
+            while (!mOpened) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                if (System.currentTimeMillis() - time > 10000) {
+                    Log.w(TAG, "Task running for over 10 seconds, something is wrong");
+                    cancel(true);
+                    break;
+                }
+            }
 
             return null;
         }

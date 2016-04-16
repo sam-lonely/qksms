@@ -1,31 +1,35 @@
 package com.moez.QKSMS.ui.dialog.mms;
 
 import android.app.DialogFragment;
-import android.app.Fragment;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
-
-import com.moez.QKSMS.mmssms.Settings;
-import com.moez.QKSMS.transaction.SmsHelper;
+import com.moez.QKSMS.R;
 import com.moez.QKSMS.mmssms.Apn;
 import com.moez.QKSMS.mmssms.ApnUtils;
-import com.moez.QKSMS.R;
-import com.moez.QKSMS.ui.MainActivity;
+import com.moez.QKSMS.mmssms.Settings;
+import com.moez.QKSMS.transaction.SmsHelper;
+import com.moez.QKSMS.ui.base.QKFragment;
 
 import java.util.List;
 
-import static com.moez.QKSMS.ui.dialog.mms.QKDialogFragment.*;
+import static com.moez.QKSMS.ui.dialog.mms.MMSDialogFragment.DISMISS_RESULT;
+import static com.moez.QKSMS.ui.dialog.mms.MMSDialogFragment.DialogFragmentListener;
+import static com.moez.QKSMS.ui.dialog.mms.MMSDialogFragment.LIST_ITEM_CLICK_RESULT;
+import static com.moez.QKSMS.ui.dialog.mms.MMSDialogFragment.NEGATIVE_BUTTON_RESULT;
+import static com.moez.QKSMS.ui.dialog.mms.MMSDialogFragment.NEUTRAL_BUTTON_RESULT;
+import static com.moez.QKSMS.ui.dialog.mms.MMSDialogFragment.POSITIVE_BUTTON_RESULT;
 
 /**
  * @author Shane Creighton-Young
  * @since 2015-02-08
  */
-public class MMSSetupFragment extends Fragment implements DialogFragmentListener {
+public class MMSSetupFragment extends QKFragment implements DialogFragmentListener {
     public static final String TAG = "MMSSetupFragment";
     private static final boolean LOCAL_LOGV = true;
 
@@ -73,7 +77,7 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
         super.onCreate(savedInstanceState);
 
         // Get the APNs, which will be used in MMS setup.
-        mAPNs = ApnUtils.query(getActivity());
+        mAPNs = ApnUtils.query(mContext);
 
         // Initialize arguments
         initArguments();
@@ -140,7 +144,7 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
             } else if (resultCode == NEGATIVE_BUTTON_RESULT) {
                 if (mArgDontAskAgainPref != null) {
                     // Save a "don't ask again" pref (this is the DON'T ASK AGAIN button).
-                    MainActivity.getPrefs(getActivity())
+                    mContext.getPrefs()
                             .edit()
                             .putBoolean(mArgDontAskAgainPref, true)
                             .commit();
@@ -158,7 +162,7 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
 
             if (mArgDontAskAgainPref != null) {
                 // Don't annoy them with automatic configuration after we've tried and failed.
-                MainActivity.getPrefs(getActivity())
+                PreferenceManager.getDefaultSharedPreferences(mContext)
                         .edit()
                         .putBoolean(mArgDontAskAgainPref, true)
                         .commit();
@@ -167,7 +171,7 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
             if (resultCode == POSITIVE_BUTTON_RESULT) {
 
                 // Send an email to the qksms team
-                contactSupport(getActivity());
+                contactSupport(mContext);
 
             } else if (resultCode == NEGATIVE_BUTTON_RESULT) {
                 // Show "Next steps" dialog telling them how to set up MMS in the future.
@@ -180,7 +184,7 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
                 // Success! Save the APN settings and show them instructions for how to change
                 // settings later.
                 Apn apn = mAPNs.get(0);
-                ApnUtils.persistApn(getActivity(), apn);
+                ApnUtils.persistApn(mContext, apn);
 
                 launchDialog(SUCCESS);
 
@@ -249,7 +253,7 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
         if (MULTIPLE_CONFIGURATIONS_FOUND.equals(dialogTag)) {
             if (resultCode == LIST_ITEM_CLICK_RESULT) {
                 Apn apn = mAPNs.get(index);
-                ApnUtils.persistApn(getActivity(), apn);
+                ApnUtils.persistApn(mContext, apn);
 
                 launchDialog(SUCCESS);
             }
@@ -266,8 +270,8 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
         mDialogTag = dialogTag;
 
         if (SET_UP_MMS.equals(dialogTag)) {
-            QKDialogFragment f = new QKDialogFragment()
-                    .setContext(getActivity())
+            MMSDialogFragment f = new MMSDialogFragment()
+                    .setContext(mContext)
                     .setTitle(R.string.set_up_mms_title)
                     .setMessage(R.string.set_up_mms_description)
                     .setListener(this)
@@ -284,8 +288,8 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
             f.show(getFragmentManager(), SET_UP_MMS);
 
         } else if (NO_CONFIGURATIONS_FOUND.equals(dialogTag)) {
-            new QKDialogFragment()
-                    .setContext(getActivity())
+            new MMSDialogFragment()
+                    .setContext(mContext)
                     .setTitle(R.string.mms_setup_no_configurations_found_title)
                     .setMessage(R.string.mms_setup_no_configurations_found_body)
                     .setListener(this)
@@ -298,8 +302,8 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
             String message = getString(R.string.mms_setup_one_configuration_found_body,
                     carrier);
 
-            new QKDialogFragment()
-                    .setContext(getActivity())
+            new MMSDialogFragment()
+                    .setContext(mContext)
                     .setTitle(R.string.mms_setup_one_configuration_found_title)
                     .setMessage(message)
                     .setListener(this)
@@ -313,8 +317,8 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
                 items[i] = mAPNs.get(i).name;
             }
 
-            new QKDialogFragment()
-                    .setContext(getActivity())
+            new MMSDialogFragment()
+                    .setContext(mContext)
                     .setTitle(R.string.mms_setup_multiple_configurations_found_title)
                     .setMessage(R.string.mms_setup_multiple_configurations_found_body)
                     .setListener(this)
@@ -323,8 +327,8 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
                     .show(getFragmentManager(), MULTIPLE_CONFIGURATIONS_FOUND);
 
         } else if (SETTING_UP_MMS_LATER.equals(dialogTag)) {
-            new QKDialogFragment()
-                    .setContext(getActivity())
+            new MMSDialogFragment()
+                    .setContext(mContext)
                     .setTitle(R.string.mms_setup_setting_up_later_title)
                     .setMessage(R.string.mms_setup_setting_up_later_body)
                     .setListener(this)
@@ -332,8 +336,8 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
                     .show(getFragmentManager(), SETTING_UP_MMS_LATER);
 
         } else if (NEXT_STEPS.equals(dialogTag)) {
-            new QKDialogFragment()
-                    .setContext(getActivity())
+            new MMSDialogFragment()
+                    .setContext(mContext)
                     .setTitle(R.string.mms_setup_next_steps_title)
                     .setMessage(R.string.mms_setup_next_steps_body)
                     .setListener(this)
@@ -341,8 +345,8 @@ public class MMSSetupFragment extends Fragment implements DialogFragmentListener
                     .show(getFragmentManager(), NEXT_STEPS);
 
         } else if (SUCCESS.equals(dialogTag)) {
-            new QKDialogFragment()
-                    .setContext(getActivity())
+            new MMSDialogFragment()
+                    .setContext(mContext)
                     .setTitle(R.string.mms_setup_success_title)
                     .setMessage(R.string.mms_setup_success_body)
                     .setListener(this)

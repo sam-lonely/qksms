@@ -4,36 +4,34 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ArgbEvaluator;
 import android.animation.ValueAnimator;
+import android.annotation.TargetApi;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
-import android.graphics.PorterDuff;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.LinearLayout;
 import com.moez.QKSMS.R;
 import com.moez.QKSMS.common.AnalyticsManager;
+import com.moez.QKSMS.common.CIELChEvaluator;
+import com.moez.QKSMS.common.ConversationPrefsHelper;
 import com.moez.QKSMS.common.LiveViewManager;
-import com.moez.QKSMS.interfaces.LiveView;
+import com.moez.QKSMS.enums.QKPreference;
+import com.moez.QKSMS.common.utils.ColorUtils;
 import com.moez.QKSMS.receiver.IconColorReceiver;
 import com.moez.QKSMS.ui.base.QKActivity;
 import com.moez.QKSMS.ui.dialog.QKDialog;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
 import com.moez.QKSMS.ui.view.QKTextView;
 import com.moez.QKSMS.ui.view.colorpicker.ColorPickerPalette;
-import com.moez.QKSMS.ui.view.colorpicker.ColorPickerSwatch;
 import com.moez.QKSMS.ui.widget.WidgetProvider;
-import com.readystatesoftware.systembartint.SystemBarTintManager;
-
-import java.util.Set;
 
 public class ThemeManager {
     private final static String TAG = "ThemeManager";
@@ -42,63 +40,31 @@ public class ThemeManager {
     public static final int TRANSITION_LENGTH = 500;
 
     public enum Theme {
-        WHITE,
-        OFFWHITE,
-        GREY,
+        LIGHT,
+        DARK,
         BLACK;
 
-        public static final String PREF_WHITE = "white";
-        public static final String PREF_OFFWHITE = "offwhite";
+        public static final String PREF_OFFWHITE = "light";
         public static final String PREF_GREY = "grey";
         public static final String PREF_BLACK = "black";
 
         public static Theme fromString(String color) {
             switch (color) {
-                case PREF_WHITE:
-                    return WHITE;
                 case PREF_OFFWHITE:
-                    return OFFWHITE;
+                    return LIGHT;
                 case PREF_GREY:
-                    return GREY;
+                    return DARK;
                 case PREF_BLACK:
                     return BLACK;
                 default:
                     Log.w(TAG, "Tried to set theme with invalid string: " + color);
-                    return OFFWHITE;
+                    return LIGHT;
             }
         }
     }
 
-    private static int sColor;
-    private static int sBackgroundColor;
-    private static Theme sTheme;
-
-    private static int sTextOnColorPrimary;
-    private static int sTextOnColorSecondary;
-    private static int sTextOnBackgroundPrimary;
-    private static int sTextOnBackgroundSecondary;
-    private static int sSentBubbleRes;
-    private static int sSentBubbleAltRes;
-    private static int sSentBubbleColor;
-    private static int sReceivedBubbleRes;
-    private static int sReceivedBubbleAltRes;
-    private static int sReceivedBubbleColor;
-    private static Drawable sRippleBackground;
-
-    private static SystemBarTintManager sTintManager;
-    private static Drawable sStatusBarTintDrawable;
-    private static Resources sResources;
-    private static SharedPreferences sPrefs;
-
-    private static boolean status_tint = false;
-    private static boolean status_compat = true;
-    private static boolean system_flat = false;
-
-    private static QKActivity mActivity;
-    private static Context mContext;
-
-    // Colours copied from http://www.google.com/design/spec/style/color.html#color-ui-color-palette
-    private static final int[][] COLOURS = {{
+    // Colors copied from http://www.google.com/design/spec/style/color.html#color-ui-color-palette
+    private static final int[][] COLORS = {{
             // Red
             0xfffde0dc, 0xfff9bdbb, 0xfff69988, 0xfff36c60,
             0xffe84e40, 0xffe51c23, 0xffdd191d, 0xffd01716,
@@ -181,25 +147,25 @@ public class ThemeManager {
      * These are the colors that go in the initial palette.
      */
     public static final int[] PALETTE = {
-            COLOURS[0][5], // Red
-            COLOURS[1][5], // Pink
-            COLOURS[2][5], // Purple
-            COLOURS[3][5], // Deep purple
-            COLOURS[4][5], // Indigo
-            COLOURS[5][5], // Blue
-            COLOURS[6][5], // Light Blue
-            COLOURS[7][5], // Cyan
-            COLOURS[8][5], // Teal
-            COLOURS[9][5], // Green
-            COLOURS[10][5], // Light Green
-            COLOURS[11][5], // Lime
-            COLOURS[12][5], // Yellow
-            COLOURS[13][5], // Amber
-            COLOURS[14][5], // Orange
-            COLOURS[15][5], // Deep Orange
-            COLOURS[16][5], // Brown
-            COLOURS[17][5], // Grey
-            COLOURS[18][5] // Blue Grey
+            COLORS[0][5], // Red
+            COLORS[1][5], // Pink
+            COLORS[2][5], // Purple
+            COLORS[3][5], // Deep purple
+            COLORS[4][5], // Indigo
+            COLORS[5][5], // Blue
+            COLORS[6][5], // Light Blue
+            COLORS[7][5], // Cyan
+            COLORS[8][5], // Teal
+            COLORS[9][5], // Green
+            COLORS[10][5], // Light Green
+            COLORS[11][5], // Lime
+            COLORS[12][5], // Yellow
+            COLORS[13][5], // Amber
+            COLORS[14][5], // Orange
+            COLORS[15][5], // Deep Orange
+            COLORS[16][5], // Brown
+            COLORS[17][5], // Grey
+            COLORS[18][5] // Blue Grey
     };
 
     /**
@@ -246,152 +212,103 @@ public class ThemeManager {
             0, 0, 0, 1, 1, 1, 1, 1, 1, 1
     }};
 
-    /**
-     * Loads all theme properties. Should be called during onCreate
-     * of each activity that contains fragments that use ThemeManager
-     */
-    public static void loadThemeProperties(Context context) {
-        sPrefs = MainActivity.getPrefs(context);
-        sResources = MainActivity.getRes(context);
+    private static int mColor;
+    private static int mActiveColor;
+    private static int mBackgroundColor;
+    private static Theme mTheme;
 
+    private static int mTextOnColorPrimary;
+    private static int mTextOnColorSecondary;
+    private static int mTextOnBackgroundPrimary;
+    private static int mtextOnBackgroundSecondary;
+    private static int mSentBubbleRes;
+    private static int mSentBubbleAltRes;
+    private static boolean mSentBubbleColored;
+    private static int mReceivedBubbleRes;
+    private static int mReceivedBubbleAltRes;
+    private static boolean mReceivedBubbleColored;
+    private static Drawable mRippleBackground;
+
+    private static Resources mResources;
+    private static SharedPreferences mPrefs;
+
+    private static Context mContext;
+
+    public static void init(Context context) {
         mContext = context;
 
-        sColor = Integer.parseInt(sPrefs.getString(SettingsFragment.THEME, "" + ThemeManager.DEFAULT_COLOR));
+        mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+        mResources = context.getResources();
 
-        if (context instanceof QKActivity) {
-            mActivity = (QKActivity) context;
-            mActivity.getSupportActionBar().setBackgroundDrawable(new ColorDrawable(sColor));
-        }
+        mColor = Integer.parseInt(mPrefs.getString(SettingsFragment.THEME, "" + ThemeManager.DEFAULT_COLOR));
+        mActiveColor = mColor;
 
-        initializeTheme(Theme.fromString(sPrefs.getString(SettingsFragment.BACKGROUND, "offwhite")));
-
-        status_tint = sPrefs.getBoolean(SettingsFragment.STATUS_TINT, Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP);
-        status_compat = sPrefs.getBoolean(SettingsFragment.STATUS_COMPAT, false);
-        system_flat = sPrefs.getBoolean(SettingsFragment.SYSTEM_BAR_FLAT, false);
-
-        if (mActivity != null) {
-            sTintManager = new SystemBarTintManager(mActivity);
-            sTintManager.setStatusBarTintEnabled(!status_compat);
-            sTintManager.setNavigationBarTintEnabled(false);
-            sTintManager.setStatusBarTintColor(status_tint ? sColor : sResources.getColor(R.color.black));
-            sTintManager.setNavigationBarTintColor(sResources.getColor(R.color.black));
-        }
-
-        sStatusBarTintDrawable = sResources.getDrawable(R.drawable.status_bar_background);
-        if (sStatusBarTintDrawable != null) {
-            sStatusBarTintDrawable.setColorFilter(status_tint ? sColor : sResources.getColor(R.color.black), PorterDuff.Mode.MULTIPLY);
-        }
-
-        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.KITKAT && system_flat) {
-            sTintManager.setStatusBarTintDrawable(sStatusBarTintDrawable);
-        }
+        initializeTheme(Theme.fromString(mPrefs.getString(SettingsFragment.BACKGROUND, "offwhite")));
     }
 
     public static void setTheme(Theme theme) {
-        int startColor = sBackgroundColor;
+        final int startColor = mBackgroundColor;
         initializeTheme(theme);
-        int endColor = sBackgroundColor;
+        final int endColor = mBackgroundColor;
 
-        if (mActivity instanceof MainActivity) {
-            final View background = mActivity.findViewById(R.id.menu_frame).getRootView();
-            final View menu = mActivity.findViewById(R.id.menu_frame);
-            final View content = mActivity.findViewById(R.id.content_frame);
-            final View fragment = ((MainActivity) mActivity).getContent().getView();
-
-            if (startColor != endColor) {
-                ValueAnimator backgroundAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), startColor, endColor);
-                backgroundAnimation.setDuration(TRANSITION_LENGTH);
-                backgroundAnimation.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                    @Override
-                    public void onAnimationUpdate(ValueAnimator animation) {
-                        int color = (Integer) animation.getAnimatedValue();
-                        if (fragment != null) {
-                            fragment.setBackgroundColor(color);
-                        }
-                        background.setBackgroundColor(color);
-                        menu.setBackgroundColor(color);
-                        content.setBackgroundColor(color);
-                    }
-                });
-                backgroundAnimation.addListener(new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        // This updates the colors and fonts of all the views.
-                        LiveViewManager.refreshViews(SettingsFragment.BACKGROUND);
-                        WidgetProvider.notifyThemeChanged(mContext);
-                    }
-                });
-                backgroundAnimation.start();
-            } else {
-                // This updates the colors and fonts of all the views.
-                LiveViewManager.refreshViews(SettingsFragment.BACKGROUND);
-                background.setBackgroundColor(endColor);
-                menu.setBackgroundColor(endColor);
-                content.setBackgroundColor(endColor);
-                WidgetProvider.notifyThemeChanged(mContext);
-            }
+        if (startColor != endColor) {
+            ValueAnimator backgroundAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), startColor, endColor);
+            backgroundAnimation.setDuration(TRANSITION_LENGTH);
+            backgroundAnimation.addUpdateListener(animation -> {
+                mBackgroundColor = (Integer) animation.getAnimatedValue();
+                LiveViewManager.refreshViews(QKPreference.BACKGROUND);
+            });
+            backgroundAnimation.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    mBackgroundColor = endColor;
+                    LiveViewManager.refreshViews(QKPreference.BACKGROUND);
+                    WidgetProvider.notifyThemeChanged(mContext);
+                }
+            });
+            backgroundAnimation.start();
         } else {
-            // This updates the colors and fonts of all the views.
-            LiveViewManager.refreshViews(SettingsFragment.BACKGROUND);
+            LiveViewManager.refreshViews(QKPreference.BACKGROUND);
             WidgetProvider.notifyThemeChanged(mContext);
         }
     }
 
     public static void initializeTheme(Theme theme) {
-        sTheme = theme;
+        mTheme = theme;
 
         switch (theme) {
-            case WHITE:
-                sBackgroundColor = sResources.getColor(R.color.white_pure);
-                if (mContext != null) mContext.setTheme(mContext instanceof MainActivity ?
-                        R.style.AppThemeWhite : R.style.AppThemeWhiteDialog);
+            case LIGHT:
+                mBackgroundColor = mResources.getColor(R.color.grey_light_mega_ultra);
+                mTextOnBackgroundPrimary = mResources.getColor(R.color.theme_light_text_primary);
+                mtextOnBackgroundSecondary = mResources.getColor(R.color.theme_light_text_secondary);
+                mRippleBackground = mResources.getDrawable(R.drawable.button_background_transparent);
                 break;
-            case OFFWHITE:
-                sBackgroundColor = sResources.getColor(R.color.grey_light_mega_ultra);
-                if (mContext != null) mContext.setTheme(mContext instanceof MainActivity ?
-                        R.style.AppThemeLight : R.style.AppThemeLightDialog);
+
+            case DARK:
+                mBackgroundColor = mResources.getColor(R.color.grey_material);
+                mTextOnBackgroundPrimary = mResources.getColor(R.color.theme_dark_text_primary);
+                mtextOnBackgroundSecondary = mResources.getColor(R.color.theme_dark_text_secondary);
+                mRippleBackground = mResources.getDrawable(R.drawable.button_background_transparent_light);
                 break;
-            case GREY:
-                sBackgroundColor = sResources.getColor(R.color.grey_material);
-                if (mContext != null) mContext.setTheme(mContext instanceof MainActivity ?
-                        R.style.AppThemeDark : R.style.AppThemeDarkDialog);
-                break;
+
             case BLACK:
-                sBackgroundColor = sResources.getColor(R.color.black);
-                if (mContext != null) mContext.setTheme(mContext instanceof MainActivity ?
-                        R.style.AppThemeDarkAmoled : R.style.AppThemeDarkAmoledDialog);
+                mBackgroundColor = mResources.getColor(R.color.black);
+                mTextOnBackgroundPrimary = mResources.getColor(R.color.theme_dark_text_primary);
+                mtextOnBackgroundSecondary = mResources.getColor(R.color.theme_dark_text_secondary);
+                mRippleBackground = mResources.getDrawable(R.drawable.button_background_transparent_light);
                 break;
         }
 
-        switch (sTheme) {
-            case WHITE:
-            case OFFWHITE:
-                sTextOnBackgroundPrimary = sResources.getColor(R.color.theme_light_text_primary);
-                sTextOnBackgroundSecondary = sResources.getColor(R.color.theme_light_text_secondary);
-                sRippleBackground = sResources.getDrawable(R.drawable.button_background_transparent);
-                break;
-            case GREY:
-            case BLACK:
-                sTextOnBackgroundPrimary = sResources.getColor(R.color.theme_dark_text_primary);
-                sTextOnBackgroundSecondary = sResources.getColor(R.color.theme_dark_text_secondary);
-                sRippleBackground = sResources.getDrawable(R.drawable.button_background_transparent_light);
-                break;
-        }
-
-        sTextOnColorPrimary = sResources.getColor(isColorDarkEnough(sColor) ?
+        mTextOnColorPrimary = mResources.getColor(isColorDarkEnough(mColor) ?
                 R.color.theme_dark_text_primary : R.color.theme_light_text_primary);
-        sTextOnColorSecondary = sResources.getColor(isColorDarkEnough(sColor) ?
+        mTextOnColorSecondary = mResources.getColor(isColorDarkEnough(mColor) ?
                 R.color.theme_dark_text_secondary : R.color.theme_light_text_secondary);
 
-        setSentBubbleColored(sPrefs.getBoolean(SettingsFragment.COLOUR_SENT, true));
-        setReceivedBubbleColored(sPrefs.getBoolean(SettingsFragment.COLOUR_RECEIVED, false));
-        setBubbleStyleNew(sPrefs.getBoolean(SettingsFragment.BUBBLES_NEW, true));
+        setSentBubbleColored(mPrefs.getBoolean(SettingsFragment.COLOR_SENT, true));
+        setReceivedBubbleColored(mPrefs.getBoolean(SettingsFragment.COLOR_RECEIVED, false));
+        setBubbleStyleNew(mPrefs.getBoolean(SettingsFragment.BUBBLES_NEW, true));
 
-        if (mActivity != null) {
-            // We need to set this here because the title bar is initialized before the ThemeManager,
-            // so it's not using the correct color yet
-            ((QKTextView) mActivity.findViewById(R.id.toolbar_title)).setTextColor(sTextOnColorPrimary);
-        }
+        LiveViewManager.refreshViews(QKPreference.BACKGROUND);
     }
 
     public static void setIcon(final QKActivity context) {
@@ -400,279 +317,255 @@ public class ThemeManager {
                 .setTitle(R.string.update_icon_title)
                 .setMessage(R.string.update_icon_message)
                 .setButtonBarOrientation(LinearLayout.VERTICAL)
-                .setPositiveButton(R.string.okay, new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        PackageManager packageManager = context.getPackageManager();
+                .setPositiveButton(R.string.okay, v -> {
+                    PackageManager packageManager = context.getPackageManager();
 
-                        String[] colors = {
-                                "Red", "Pink", "Purple", "DeepPurple", "Indigo", "Blue",
-                                "LightBlue", "Cyan", "Teal", "Green", "LightGreen", "Lime",
-                                "Yellow", "Amber", "Orange", "DeepOrange", "Brown", "Grey",
-                                "BlueGrey"
-                        };
+                    String[] colors = {
+                            "Red", "Pink", "Purple", "DeepPurple", "Indigo", "Blue",
+                            "LightBlue", "Cyan", "Teal", "Green", "LightGreen", "Lime",
+                            "Yellow", "Amber", "Orange", "DeepOrange", "Brown", "Grey",
+                            "BlueGrey"
+                    };
 
-                        // Disable all of the color aliases, except for the alias with the current
-                        // color.
-                        String enabledComponent = null;
-                        for (int i = 0; i < colors.length; i++) {
-                            String componentClassName = String.format(
-                                    "com.moez.QKSMS.ui.MainActivity-%s", colors[i]
+                    // Disable all of the color aliases, except for the alias with the current
+                    // color.
+                    String enabledComponent = null;
+                    for (int i = 0; i < colors.length; i++) {
+                        String componentClassName = String.format(
+                                "com.moez.QKSMS.ui.MainActivity-%s", colors[i]
+                        );
+
+                        // Save the enabled component so we can kill the app with this one when
+                        // it's all done.
+                        if (getSwatchColor(mColor) == PALETTE[i]) {
+                            enabledComponent = componentClassName;
+
+                        } else {
+                            packageManager.setComponentEnabledSetting(
+                                    new ComponentName(context, componentClassName),
+                                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                                    // Don't kill the app while we're in the loop! This will
+                                    // prevent the other component enabled settings from
+                                    // changing, i.e. they will all be disabled and the app
+                                    // won't show up to the user.
+                                    PackageManager.DONT_KILL_APP
                             );
-
-                            // Save the enabled component so we can kill the app with this one when
-                            // it's all done.
-                            if (getSwatchColour(sColor) == PALETTE[i]) {
-                                enabledComponent = componentClassName;
-
-                            } else {
-                                packageManager.setComponentEnabledSetting(
-                                        new ComponentName(context, componentClassName),
-                                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                                        // Don't kill the app while we're in the loop! This will
-                                        // prevent the other component enabled settings from
-                                        // changing, i.e. they will all be disabled and the app
-                                        // won't show up to the user.
-                                        PackageManager.DONT_KILL_APP
-                                );
-                            }
                         }
-
-                        // Broadcast an intent to a receiver that will:
-                        // 1) enable the last component; and
-                        // 2) relaunch QKSMS with the new component name.
-                        Intent intent = new Intent(IconColorReceiver.ACTION_ICON_COLOR_CHANGED);
-                        intent.putExtra(IconColorReceiver.EXTRA_COMPONENT_NAME, enabledComponent);
-                        context.sendBroadcast(intent);
                     }
+
+                    // Broadcast an intent to a receiver that will:
+                    // 1) enable the last component; and
+                    // 2) relaunch QKSMS with the new component name.
+                    Intent intent = new Intent(IconColorReceiver.ACTION_ICON_COLOR_CHANGED);
+                    intent.putExtra(IconColorReceiver.EXTRA_COMPONENT_NAME, enabledComponent);
+                    context.sendBroadcast(intent);
                 })
                 .setNegativeButton(R.string.cancel, null)
-                .show(((MainActivity) context).getFragmentManager(), "icon");
+                .show();
     }
 
     public static int getBackgroundColor() {
-        return sBackgroundColor;
+        return mBackgroundColor;
     }
 
     public static int getTextOnColorPrimary() {
-        return sTextOnColorPrimary;
+        return mTextOnColorPrimary;
     }
 
     public static int getTextOnColorSecondary() {
-        return sTextOnColorSecondary;
+        return mTextOnColorSecondary;
     }
 
     public static int getTextOnBackgroundPrimary() {
-        return sTextOnBackgroundPrimary;
+        return mTextOnBackgroundPrimary;
     }
 
     public static int getTextOnBackgroundSecondary() {
-        return sTextOnBackgroundSecondary;
+        return mtextOnBackgroundSecondary;
     }
 
     public static int getSentBubbleRes() {
-        return sSentBubbleRes;
+        return mSentBubbleRes;
     }
 
     public static int getSentBubbleAltRes() {
-        return sSentBubbleAltRes;
+        return mSentBubbleAltRes;
     }
 
     public static int getSentBubbleColor() {
-        return sSentBubbleColor;
+        return mSentBubbleColored ? mActiveColor : getNeutralBubbleColor();
     }
 
     public static int getReceivedBubbleRes() {
-        return sReceivedBubbleRes;
+        return mReceivedBubbleRes;
     }
 
     public static int getReceivedBubbleAltRes() {
-        return sReceivedBubbleAltRes;
+        return mReceivedBubbleAltRes;
     }
 
     public static int getReceivedBubbleColor() {
-        return sReceivedBubbleColor;
+        return mReceivedBubbleColored ? mActiveColor : getNeutralBubbleColor();
     }
 
     public static void setBubbleStyleNew(boolean styleNew) {
-        sSentBubbleRes = styleNew ? R.drawable.message_sent_2 : R.drawable.message_sent;
-        sSentBubbleAltRes = styleNew ? R.drawable.message_sent_alt_2 : R.drawable.message_sent_alt;
-        sReceivedBubbleRes = styleNew ? R.drawable.message_received_2 : R.drawable.message_received;
-        sReceivedBubbleAltRes = styleNew ? R.drawable.message_received_alt_2 : R.drawable.message_received_alt;
+        mSentBubbleRes = styleNew ? R.drawable.message_sent_2 : R.drawable.message_sent;
+        mSentBubbleAltRes = styleNew ? R.drawable.message_sent_alt_2 : R.drawable.message_sent_alt;
+        mReceivedBubbleRes = styleNew ? R.drawable.message_received_2 : R.drawable.message_received;
+        mReceivedBubbleAltRes = styleNew ? R.drawable.message_received_alt_2 : R.drawable.message_received_alt;
     }
 
     public static void setSentBubbleColored(boolean colored) {
-        sSentBubbleColor = colored ? sColor : getNeutralBubbleColor();
+        mSentBubbleColored = colored;
     }
 
     public static void setReceivedBubbleColored(boolean colored) {
-        sReceivedBubbleColor = colored ? sColor : getNeutralBubbleColor();
+        mReceivedBubbleColored = colored;
     }
 
     public static int getNeutralBubbleColor() {
-        if (sTheme == null) {
+        if (mTheme == null) {
             return 0xeeeeee;
         }
 
-        switch (sTheme) {
-            case WHITE:
-                return sResources.getColor(R.color.grey_light_mega_ultra);
-            case OFFWHITE:
-                return sResources.getColor(R.color.white_pure);
+        switch (mTheme) {
+            case DARK:
+                return mResources.getColor(R.color.grey_dark);
+
+            case BLACK:
+                return mResources.getColor(R.color.grey_material);
+
             default:
-                return sResources.getColor(R.color.grey_dark);
+                return mResources.getColor(R.color.white_pure);
         }
     }
 
     public static Drawable getRippleBackground() {
-        return sRippleBackground;
+        return mRippleBackground;
     }
 
     public static int getColor() {
-        return sColor;
+        return mActiveColor;
+    }
+
+    public static int getThemeColor() {
+        return mColor;
     }
 
     public static Theme getTheme() {
-        return sTheme;
+        return mTheme;
     }
 
-    public static void showColourSwatchesDialog(final QKActivity context) {
+    public static boolean isNightMode() {
+        return mTheme == Theme.DARK || mTheme == Theme.BLACK;
+    }
+
+    public static void showColorPickerDialog(final QKActivity context) {
         final QKDialog dialog = new QKDialog();
 
         ColorPickerPalette palette = new ColorPickerPalette(context);
         palette.setGravity(Gravity.CENTER);
-        palette.init(19, 4, new ColorPickerSwatch.OnColorSelectedListener() {
-            @Override
-            public void onColorSelected(int color) {
-                showColourPickerDialog(context, color);
+        palette.init(19, 4, color -> {
+            palette.init(getSwatch(color).length, 4, color2 -> {
+                setColor(context, color2);
                 dialog.dismiss();
-            }
+            });
+
+            palette.drawPalette(getSwatch(color), mColor);
         });
 
-        palette.drawPalette(PALETTE, getSwatchColour(sColor));
+        palette.drawPalette(PALETTE, getSwatchColor(mColor));
 
         dialog.setContext(context)
                 .setTitle(R.string.pref_theme)
                 .setCustomView(palette)
                 .setNegativeButton(R.string.cancel, null);
 
-        dialog.show(context.getFragmentManager(), "colorpicker");
+        dialog.show();
     }
 
-    private static void showColourPickerDialog(final QKActivity context, int swatchColour) {
+    public static void showColorPickerDialogForConversation(final QKActivity context, ConversationPrefsHelper prefs) {
         final QKDialog dialog = new QKDialog();
 
         ColorPickerPalette palette = new ColorPickerPalette(context);
         palette.setGravity(Gravity.CENTER);
-        palette.init(getSwatch(swatchColour).length, 4, new ColorPickerSwatch.OnColorSelectedListener() {
-            @Override
-            public void onColorSelected(int color) {
-                setColour(color);
+        palette.init(19, 4, color -> {
+            palette.init(getSwatch(color).length, 4, color2 -> {
+                prefs.putString(QKPreference.THEME.getKey(), "" + color2);
+                setActiveColor(color2);
+                LiveViewManager.refreshViews(QKPreference.CONVERSATION_THEME);
                 dialog.dismiss();
-            }
+            });
+
+            palette.drawPalette(getSwatch(color), prefs.getColor());
         });
 
-        palette.drawPalette(getSwatch(swatchColour), sColor);
+        palette.drawPalette(PALETTE, getSwatchColor(prefs.getColor()));
 
         dialog.setContext(context)
                 .setTitle(R.string.pref_theme)
                 .setCustomView(palette)
-                .setNegativeButton(R.string.cancel, null)
-                .show(context.getFragmentManager(), "colorpicker");
+                .setNegativeButton(R.string.cancel, null);
+
+        dialog.show();
     }
 
-    public static void setStatusBarTintEnabled(boolean enabled) {
-        if (status_tint != enabled) {
-            status_tint = enabled;
-            int colorFrom = enabled ? sResources.getColor(R.color.black) : sColor;
-            int colorTo = enabled ? sColor : sResources.getColor(R.color.black);
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    public static void setStatusBarTintEnabled(QKActivity activity, boolean enabled) {
+        int colorFrom = enabled ? mResources.getColor(R.color.black) : mColor;
+        int colorTo = enabled ? mColor : mResources.getColor(R.color.black);
 
-            ValueAnimator colorAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), colorFrom, colorTo);
-            colorAnimation.setDuration(TRANSITION_LENGTH);
-            colorAnimation.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(ValueAnimator animation) {
-                    sTintManager.setStatusBarTintColor((Integer) animation.getAnimatedValue());
-
-                    if (Build.VERSION.SDK_INT == Build.VERSION_CODES.KITKAT && system_flat) {
-                        sStatusBarTintDrawable.setColorFilter((Integer) animation.getAnimatedValue(), PorterDuff.Mode.MULTIPLY);
-                        sTintManager.setStatusBarTintDrawable(sStatusBarTintDrawable);
-                    }
-                }
-            });
-            colorAnimation.start();
-        }
+        ValueAnimator colorAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), colorFrom, colorTo);
+        colorAnimation.setDuration(TRANSITION_LENGTH);
+        colorAnimation.addUpdateListener(animation -> {
+            activity.getWindow().setStatusBarColor(ColorUtils.darken((Integer) animation.getAnimatedValue()));
+        });
+        colorAnimation.start();
     }
 
-    public static void setSystemBarFlatEnabled(boolean enabled) {
-        system_flat = enabled;
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    public static void setNavigationBarTintEnabled(QKActivity activity, boolean enabled) {
+        int colorFrom = enabled ? mResources.getColor(R.color.black) : mColor;
+        int colorTo = enabled ? mColor : mResources.getColor(R.color.black);
 
-        if (status_tint) {
-            status_tint = false;
-            setStatusBarTintEnabled(true);
-        }
-    }
-
-    public static void setStatusBarTintCompat(boolean enabled) {
-        sTintManager.setStatusBarTintEnabled(!enabled);
+        ValueAnimator colorAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), colorFrom, colorTo);
+        colorAnimation.setDuration(TRANSITION_LENGTH);
+        colorAnimation.addUpdateListener(animation -> {
+            activity.getWindow().setNavigationBarColor(ColorUtils.darken((Integer) animation.getAnimatedValue()));
+        });
+        colorAnimation.start();
     }
 
     public static String getColorString(int color) {
         return String.format("#%08x", color).toUpperCase();
     }
 
-    public static void setColour(int color) {
+    public static void setColor(QKActivity activity, int color) {
 
-        AnalyticsManager.INSTANCE.sendEvent(
+        AnalyticsManager.getInstance().sendEvent(
                 AnalyticsManager.CATEGORY_PREFERENCE_CHANGE,
                 SettingsFragment.CATEGORY_THEME,
                 getColorString(color)
         );
 
-        int colourFrom = sColor;
-        sColor = color;
+        int colorFrom = mColor;
+        mColor = color;
+        mActiveColor = color;
 
-        sPrefs.edit().putString(SettingsFragment.THEME, "" + color).apply();
+        mPrefs.edit().putString(SettingsFragment.THEME, "" + color).apply();
 
-        setSentBubbleColored(sPrefs.getBoolean(SettingsFragment.COLOUR_SENT, true));
-        setReceivedBubbleColored(sPrefs.getBoolean(SettingsFragment.COLOUR_RECEIVED, false));
-        sTextOnColorPrimary = sResources.getColor(isColorDarkEnough(sColor) ?
+        setSentBubbleColored(mPrefs.getBoolean(SettingsFragment.COLOR_SENT, true));
+        setReceivedBubbleColored(mPrefs.getBoolean(SettingsFragment.COLOR_RECEIVED, false));
+        mTextOnColorPrimary = mResources.getColor(isColorDarkEnough(mColor) ?
                 R.color.theme_dark_text_primary : R.color.theme_light_text_primary);
-        sTextOnColorSecondary = sResources.getColor(isColorDarkEnough(sColor) ?
+        mTextOnColorSecondary = mResources.getColor(isColorDarkEnough(mColor) ?
                 R.color.theme_dark_text_secondary : R.color.theme_light_text_secondary);
 
-        // Some views are updated every frame of the animation; get these views here. We
-        // build this list once beforehand since it's a slightly expensive operation.
-        final Set<LiveView> views = LiveViewManager.getViews(SettingsFragment.THEME);
-
-        // Refresh all the views with the new color.
-        for (LiveView view : views) {
-            view.refresh();
-        }
-
-        ValueAnimator colorAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), colourFrom, color);
+        ValueAnimator colorAnimation = ValueAnimator.ofObject(new CIELChEvaluator(colorFrom, color), 0);
         colorAnimation.setDuration(TRANSITION_LENGTH);
         colorAnimation.setInterpolator(new DecelerateInterpolator());
-        colorAnimation.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator animation) {
-                int color = (Integer) animation.getAnimatedValue();
-
-                if (mActivity != null) {
-                    if (mActivity.getSupportActionBar() != null) {
-                        mActivity.getSupportActionBar().setBackgroundDrawable(new ColorDrawable(color));
-                    }
-                }
-
-                if (status_tint) {
-                    sTintManager.setStatusBarTintColor(color);
-
-                    if (Build.VERSION.SDK_INT == Build.VERSION_CODES.KITKAT && system_flat) {
-                        sStatusBarTintDrawable.setColorFilter(color, PorterDuff.Mode.MULTIPLY);
-                        sTintManager.setStatusBarTintDrawable(sStatusBarTintDrawable);
-                    }
-                }
-            }
+        colorAnimation.addUpdateListener(animation -> {
+            setActiveColor((Integer) animation.getAnimatedValue());
         });
         colorAnimation.addListener(new AnimatorListenerAdapter() {
             @Override
@@ -684,31 +577,33 @@ public class ThemeManager {
         colorAnimation.start();
 
 
-        if (mActivity != null && mActivity.findViewById(R.id.toolbar_title) != null) {
+        if (activity.findViewById(R.id.toolbar_title) != null) {
             //final Toolbar toolbar = (Toolbar) mActivity.findViewById(R.id.title);
-            final QKTextView title = (QKTextView) mActivity.findViewById(R.id.toolbar_title);
+            final QKTextView title = (QKTextView) activity.findViewById(R.id.toolbar_title);
 
-            if (title.getCurrentTextColor() != ThemeManager.sTextOnColorPrimary) {
-                ValueAnimator titleColorAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), title.getCurrentTextColor(), ThemeManager.sTextOnColorPrimary);
+            if (title.getCurrentTextColor() != mTextOnColorPrimary) {
+                ValueAnimator titleColorAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), title.getCurrentTextColor(), mTextOnColorPrimary);
                 titleColorAnimation.setDuration(TRANSITION_LENGTH);
                 titleColorAnimation.setInterpolator(new DecelerateInterpolator());
-                titleColorAnimation.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                    @Override
-                    public void onAnimationUpdate(ValueAnimator animation) {
-                        int color = (Integer) animation.getAnimatedValue();
-                        title.setTextColor(color);
-                        mActivity.colorMenuIcons(mActivity.getMenu(), color);
-                    }
+                titleColorAnimation.addUpdateListener(animation -> {
+                    int color1 = (Integer) animation.getAnimatedValue();
+                    title.setTextColor(color1);
+                    activity.colorMenuIcons(activity.getMenu(), color1);
                 });
                 titleColorAnimation.start();
             }
         }
     }
 
+    public static void setActiveColor(int color) {
+        mActiveColor = color;
+        LiveViewManager.refreshViews(QKPreference.THEME);
+    }
+
     private static boolean isColorDarkEnough(int color) {
-        for (int i = 0; i < COLOURS.length; i++) {
-            for (int j = 0; j < COLOURS[i].length; j++) {
-                if (color == COLOURS[i][j]) {
+        for (int i = 0; i < COLORS.length; i++) {
+            for (int j = 0; j < COLORS[i].length; j++) {
+                if (color == COLORS[i][j]) {
                     return TEXT_MODE[i][j] == 1;
                 }
             }
@@ -717,22 +612,22 @@ public class ThemeManager {
         return true;
     }
 
-    public static int getSwatchColour(int colour) {
-        for (int i = 0; i < COLOURS.length; i++) {
-            for (int j = 0; j < COLOURS[i].length; j++) {
-                if (colour == COLOURS[i][j]) {
+    public static int getSwatchColor(int color) {
+        for (int i = 0; i < COLORS.length; i++) {
+            for (int j = 0; j < COLORS[i].length; j++) {
+                if (color == COLORS[i][j]) {
                     return PALETTE[i];
                 }
             }
         }
 
-        return colour;
+        return color;
     }
 
-    private static int[] getSwatch(int colour) {
-        for (int[] swatch : COLOURS) {
+    private static int[] getSwatch(int color) {
+        for (int[] swatch : COLORS) {
             for (int swatchColor : swatch) {
-                if (colour == swatchColor) {
+                if (color == swatchColor) {
                     return swatch;
                 }
             }

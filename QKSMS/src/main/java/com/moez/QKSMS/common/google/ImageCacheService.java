@@ -50,8 +50,24 @@ public class ImageCacheService {
             mData = data;
             mOffset = offset;
         }
-        public byte[] mData;
-        public int mOffset;
+        private byte[] mData;
+        private int mOffset;
+
+        public byte[] getData() {
+            return mData;
+        }
+
+        public void setData(byte[] mData) {
+            this.mData = mData;
+        }
+
+        public int getOffset() {
+            return mOffset;
+        }
+
+        public void setOffset(int mOffset) {
+            this.mOffset = mOffset;
+        }
     }
 
     public ImageData getImageData(String path, int type) {
@@ -137,8 +153,8 @@ public class ImageCacheService {
 
     public static final long crc64Long(byte[] buffer) {
         long crc = INITIALCRC;
-        for (int k = 0, n = buffer.length; k < n; ++k) {
-            crc = sCrcTable[(((int) crc) ^ buffer[k]) & 0xff] ^ (crc >> 8);
+        for (byte aBuffer : buffer) {
+            crc = sCrcTable[(((int) crc) ^ aBuffer) & 0xff] ^ (crc >> 8);
         }
         return crc;
     }

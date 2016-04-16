@@ -3,8 +3,8 @@ package com.moez.QKSMS.common;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
+import android.preference.PreferenceManager;
 import com.moez.QKSMS.R;
-import com.moez.QKSMS.ui.MainActivity;
 import com.moez.QKSMS.ui.ThemeManager;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
 
@@ -16,6 +16,7 @@ public class FontManager {
     public static final int TEXT_SIZE_LARGEST = 3;
 
     // Attribute codes
+    public static final int TEXT_TYPE_PRIMARY_BOLD = 0x0;
     public static final int TEXT_TYPE_PRIMARY = 0x1;
     public static final int TEXT_TYPE_SECONDARY = 0x2;
     public static final int TEXT_TYPE_TERTIARY = 0x3;
@@ -26,12 +27,12 @@ public class FontManager {
     public static final int TEXT_TYPE_TOOLBAR = 0x8;
 
     public static int getFontFamily(Context context) {
-        SharedPreferences prefs = MainActivity.getPrefs(context);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         return Integer.parseInt(prefs.getString(SettingsFragment.FONT_FAMILY, "0"));
     }
 
     public static int getTextSize(Context context, int type) {
-        SharedPreferences prefs = MainActivity.getPrefs(context);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         int fontSize = Integer.parseInt(prefs.getString(SettingsFragment.FONT_SIZE, "1"));
 
         switch (type) {
@@ -49,6 +50,7 @@ public class FontManager {
                 if (fontSize == TEXT_SIZE_LARGE) return 16;
                 if (fontSize == TEXT_SIZE_LARGEST) return 18;
                 break;
+            case TEXT_TYPE_PRIMARY_BOLD:
             case TEXT_TYPE_PRIMARY:
             case TEXT_TYPE_DIALOG_MESSAGE:
                 if (fontSize == TEXT_SIZE_SMALL) return 14;
@@ -77,6 +79,7 @@ public class FontManager {
             case FontManager.TEXT_TYPE_TOOLBAR:
                 return false;
 
+            case FontManager.TEXT_TYPE_PRIMARY_BOLD:
             case FontManager.TEXT_TYPE_CATEGORY:
             case FontManager.TEXT_TYPE_DIALOG_TITLE:
             case FontManager.TEXT_TYPE_DIALOG_BUTTON:
@@ -88,8 +91,9 @@ public class FontManager {
     public static ColorStateList getTextColor(Context context, int type) {
         // Colors and font weight
         switch (type) {
+            case FontManager.TEXT_TYPE_PRIMARY_BOLD:
             case FontManager.TEXT_TYPE_PRIMARY:
-                boolean isNight = ThemeManager.getTheme() == ThemeManager.Theme.GREY ||
+                boolean isNight = ThemeManager.getTheme() == ThemeManager.Theme.DARK ||
                                   ThemeManager.getTheme() == ThemeManager.Theme.BLACK;
                 int id = isNight ? R.color.text_primary_dark : R.color.text_primary_light;
                 return context.getResources().getColorStateList(id);
@@ -112,7 +116,7 @@ public class FontManager {
     }
 
     public static int getFontWeight(Context context, boolean heavy) {
-        SharedPreferences prefs = MainActivity.getPrefs(context);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         int fontWeight = Integer.parseInt(prefs.getString(SettingsFragment.FONT_WEIGHT, "0"));
         int fontFamily = getFontFamily(context);
 
@@ -123,7 +127,7 @@ public class FontManager {
         // Otherwise, get the heavy font weight.
         if (fontWeight == TypefaceManager.TextWeight.LIGHT) {
             return TypefaceManager.TextWeight.NORMAL;
-        } else if (fontFamily == TypefaceManager.FontFamily.ROBOTO || fontFamily == TypefaceManager.FontFamily.LATO) {
+        } else if (fontFamily == TypefaceManager.FontFamily.ROBOTO) {
             return TypefaceManager.TextWeight.MEDIUM;
         } else {
             return TypefaceManager.TextWeight.BOLD;

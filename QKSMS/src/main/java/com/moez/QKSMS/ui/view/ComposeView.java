@@ -14,6 +14,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.PorterDuff;
+import android.graphics.drawable.AnimationDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -22,6 +23,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.provider.MediaStore;
+import android.support.v4.content.ContextCompat;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -36,6 +38,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 import com.github.lzyzsd.circleprogress.DonutProgress;
+import com.moez.QKSMS.common.LiveViewManager;
+import com.moez.QKSMS.enums.QKPreference;
 import com.moez.QKSMS.mmssms.Transaction;
 import com.moez.QKSMS.mmssms.Utils;
 import com.moez.QKSMS.R;
@@ -43,22 +47,18 @@ import com.moez.QKSMS.common.AnalyticsManager;
 import com.moez.QKSMS.data.Conversation;
 import com.moez.QKSMS.data.ConversationLegacy;
 import com.moez.QKSMS.interfaces.ActivityLauncher;
-import com.moez.QKSMS.interfaces.LiveView;
 import com.moez.QKSMS.interfaces.RecipientProvider;
-import com.moez.QKSMS.common.LiveViewManager;
 import com.moez.QKSMS.common.utils.ImageUtils;
 import com.moez.QKSMS.common.utils.PhoneNumberUtils;
 import com.moez.QKSMS.common.utils.Units;
 import com.moez.QKSMS.transaction.NotificationManager;
 import com.moez.QKSMS.transaction.SmsHelper;
-import com.moez.QKSMS.ui.MainActivity;
 import com.moez.QKSMS.ui.ThemeManager;
 import com.moez.QKSMS.ui.base.QKActivity;
 import com.moez.QKSMS.ui.dialog.DefaultSmsHelper;
 import com.moez.QKSMS.ui.dialog.QKDialog;
 import com.moez.QKSMS.ui.dialog.mms.MMSSetupFragment;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
-import com.moez.QKSMS.ui.welcome.DemoConversationCursorLoader;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -67,7 +67,7 @@ import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class ComposeView extends LinearLayout implements View.OnClickListener, LiveView {
+public class ComposeView extends LinearLayout implements View.OnClickListener {
     public final static String TAG = "ComposeView";
 
     private final String KEY_DELAYED_INFO_DIALOG_SHOWN = "delayed_info_dialog_shown";
@@ -106,8 +106,7 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
     private FrameLayout mButton;
     private DonutProgress mProgress;
     private ImageView mButtonBackground;
-    private ImageView mButtonBar1;
-    private ImageView mButtonBar2;
+    private ImageView mComposeIcon;
     private ImageButton mAttach;
     private ImageButton mCamera;
     private ImageButton mDelay;
@@ -140,8 +139,8 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
         super(context, attrs, defStyle);
 
         mContext = (QKActivity) context;
-        mPrefs = MainActivity.getPrefs(mContext);
-        mRes = MainActivity.getRes(mContext);
+        mPrefs = mContext.getPrefs();
+        mRes = mContext.getResources();
 
         mDelayedMessagingEnabled = mPrefs.getBoolean(SettingsFragment.DELAYED, false);
         try {
@@ -166,8 +165,7 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
         mButton = (FrameLayout) findViewById(R.id.compose_button);
         mProgress = (DonutProgress) findViewById(R.id.progress);
         mButtonBackground = (ImageView) findViewById(R.id.compose_button_background);
-        mButtonBar1 = (ImageView) findViewById(R.id.compose_button_bar_1);
-        mButtonBar2 = (ImageView) findViewById(R.id.compose_button_bar_2);
+        mComposeIcon = (ImageView) findViewById(R.id.compose_icon);
         mAttachmentPanel = findViewById(R.id.attachment_panel);
         mAttach = (ImageButton) findViewById(R.id.attach);
         mCamera = (ImageButton) findViewById(R.id.camera);
@@ -183,29 +181,48 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
         mCancel.setOnClickListener(this);
         mDelay.setOnClickListener(this);
 
-        LiveViewManager.registerView(this);
-        LiveViewManager.registerPreference(this, SettingsFragment.THEME);
-        LiveViewManager.registerPreference(this, SettingsFragment.BACKGROUND);
+        LiveViewManager.registerView(QKPreference.THEME, this, key -> {
+            mButtonBackground.setColorFilter(ThemeManager.getColor(), PorterDuff.Mode.SRC_ATOP);
+            mComposeIcon.setColorFilter(ThemeManager.getTextOnColorPrimary(), PorterDuff.Mode.SRC_ATOP);
+            mAttachmentPanel.setBackgroundColor(ThemeManager.getColor());
+            mAttach.setColorFilter(ThemeManager.getTextOnColorPrimary(), PorterDuff.Mode.SRC_ATOP);
+            mCamera.setColorFilter(ThemeManager.getTextOnColorPrimary(), PorterDuff.Mode.SRC_ATOP);
+            updateDelayButton();
+            mProgress.setUnfinishedStrokeColor(ThemeManager.getTextOnColorSecondary());
+            mProgress.setFinishedStrokeColor(ThemeManager.getTextOnColorPrimary());
+            if (ThemeManager.getSentBubbleRes() != 0) mReplyText.setBackgroundResource(ThemeManager.getSentBubbleRes());
+        });
 
-        refresh();
+        LiveViewManager.registerView(QKPreference.BACKGROUND, this, key -> {
+            mReplyText.getBackground().setColorFilter(ThemeManager.getNeutralBubbleColor(), PorterDuff.Mode.SRC_ATOP);
+            getBackground().setColorFilter(ThemeManager.getBackgroundColor(), PorterDuff.Mode.SRC_ATOP);
+        });
 
         // There is an option for using the return button instead of the emoticon button in the
         // keyboard; set that up here.
         switch (Integer.parseInt(mPrefs.getString(SettingsFragment.ENTER_BUTTON, "0"))) {
             case 0: // emoji
                 break;
-            case 1: // return
+            case 1: // new line
                 mReplyText.setInputType(InputType.TYPE_CLASS_TEXT |
-                        InputType.TYPE_TEXT_VARIATION_LONG_MESSAGE |
-                        InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+                        InputType.TYPE_TEXT_FLAG_CAP_SENTENCES |
+                        InputType.TYPE_TEXT_VARIATION_LONG_MESSAGE);
                 mReplyText.setSingleLine(false);
                 break;
             case 2: // send
-                mReplyText.setInputType(
+                mReplyText.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+                mReplyText.setInputType(InputType.TYPE_CLASS_TEXT |
                         InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-                mReplyText.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI |
-                        EditorInfo.IME_ACTION_SEND);
                 mReplyText.setSingleLine(false);
+                mReplyText.setOnKeyListener(new OnKeyListener() { //Workaround because ACTION_SEND does not support multiline mode
+                    @Override
+                    public boolean onKey(View v, int keyCode, KeyEvent event) {
+                        if (keyCode == 66) {
+                            sendSms();
+                            return true;
+                        }
+                        return false;
+                    }});
                 break;
         }
 
@@ -225,18 +242,6 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
                 } else if (160 < length) {
                     mLetterCount.setText((160 - length % 160) + "/" + (length / 160 + 1));
                 }
-            }
-        });
-
-        mReplyText.setOnEditorActionListener(new android.widget.TextView.OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(android.widget.TextView v, int actionId, KeyEvent event) {
-                if (actionId == EditorInfo.IME_ACTION_SEND) {
-                    sendSms();
-                    return true;
-                }
-
-                return false;
             }
         });
 
@@ -320,11 +325,11 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
         if (requestCode == REQUEST_CODE_IMAGE && resultCode == Activity.RESULT_OK) {
             result = true;
 
-            Toast.makeText(mContext, "Loading attachment", Toast.LENGTH_LONG).show();
+            Toast.makeText(mContext, R.string.compose_loading_attachment, Toast.LENGTH_LONG).show();
             new ImageLoaderTask(mContext, data.getData()).execute();
         } else if (requestCode == REQUEST_CODE_CAMERA && resultCode == Activity.RESULT_OK) {
             result = true;
-            Toast.makeText(mContext, "Loading attachment", Toast.LENGTH_LONG).show();
+            Toast.makeText(mContext, R.string.compose_loading_attachment, Toast.LENGTH_LONG).show();
             new ImageLoaderFromCameraTask().execute((Void[]) null);
         }
 
@@ -355,30 +360,27 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
 
     private void updateButtonState(SendButtonState buttonState) {
         if (mButtonState != buttonState) {
+
+            // Check if we need to switch animations
+            AnimationDrawable animation = null;
+            if (buttonState == SendButtonState.SEND) {
+                animation = (AnimationDrawable) ContextCompat.getDrawable(mContext, R.drawable.plus_to_arrow);
+            } else if (mButtonState == SendButtonState.SEND) {
+                animation = (AnimationDrawable) ContextCompat.getDrawable(mContext, R.drawable.arrow_to_plus);
+            }
+            if (animation != null) {
+                mComposeIcon.setImageDrawable(animation);
+                animation.start();
+            }
+
+            // Handle any necessary rotation
+            float rotation = mComposeIcon.getRotation();
+            float target = buttonState == SendButtonState.ATTACH || buttonState == SendButtonState.SEND ? 0 : 45;
+            ObjectAnimator.ofFloat(mComposeIcon, "rotation", rotation, target)
+                    .setDuration(ANIMATION_DURATION)
+                    .start();
+
             mButtonState = buttonState;
-
-            float translation = Units.dpToPx(mContext, 14) / 3;
-            float barRotation1 = mButtonBar1.getRotation();
-            float barTranslation1 = mButtonBar1.getTranslationY();
-            float barRotation2 = mButtonBar2.getRotation();
-            float barTranslation2 = mButtonBar2.getTranslationY();
-            float barRotationTarget1 = mButtonState == SendButtonState.ATTACH ? 0 : 225;
-            float barTranslationTarget1 = mButtonState == SendButtonState.SEND ? -translation : 0;
-            float barRotationTarget2 = mButtonState == SendButtonState.ATTACH ? 90 : 135;
-            float barTranslationTarget2 = mButtonState == SendButtonState.SEND ? translation : 0;
-
-            ObjectAnimator.ofFloat(mButtonBar1, "rotation", barRotation1, barRotationTarget1)
-                    .setDuration(ANIMATION_DURATION)
-                    .start();
-            ObjectAnimator.ofFloat(mButtonBar2, "rotation", barRotation2, barRotationTarget2)
-                    .setDuration(ANIMATION_DURATION)
-                    .start();
-            ObjectAnimator.ofFloat(mButtonBar1, "translationY", barTranslation1, barTranslationTarget1)
-                    .setDuration(ANIMATION_DURATION)
-                    .start();
-            ObjectAnimator.ofFloat(mButtonBar2, "translationY", barTranslation2, barTranslationTarget2)
-                    .setDuration(ANIMATION_DURATION)
-                    .start();
         }
     }
 
@@ -460,7 +462,9 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
             }
 
             long threadId = mConversation != null ? mConversation.getThreadId() : 0;
-            sendTransaction.sendNewMessage(message, threadId);
+            if (!message.toString().equals("")) {
+                sendTransaction.sendNewMessage(message, threadId);
+            }
             NotificationManager.update(mContext);
 
             if (mConversationLegacy != null) {
@@ -542,8 +546,8 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
                         toggleDelayedMessaging();
                     }
                 })
-                .show(((QKActivity) mContext).getFragmentManager(), "delayed message info");
-        mPrefs.edit().putBoolean(KEY_DELAYED_INFO_DIALOG_SHOWN, true).apply();
+                .show();
+        mPrefs.edit().putBoolean(KEY_DELAYED_INFO_DIALOG_SHOWN, true).apply(); //This should be changed, the dialog should be shown each time when delayed messaging is disabled.
     }
 
     private void handleComposeButtonClick() {
@@ -577,7 +581,7 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
 
                     } else if (!isDefaultSmsApp) {
                         // Ask to become the default SMS app
-                        new DefaultSmsHelper(mContext, null, R.string.not_default_send).showIfNotDefault(this);
+                        new DefaultSmsHelper(mContext, R.string.not_default_send).showIfNotDefault(this);
 
                     } else if (!TextUtils.isEmpty(mReplyText.getText()) || mAttachment.hasAttachment()) {
                         if (mDelayedMessagingEnabled) {
@@ -711,7 +715,7 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
         mConversationLegacy = conversationLegacy;
 
         // If the conversation was different, set up the draft here.
-        if (threadId != newThreadId) {
+        if (threadId != newThreadId || newThreadId == -1) {
             setupDraft();
         }
     }
@@ -731,17 +735,27 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
     public void saveDraft() {
         // If the conversation_reply view is null, then we won't worry about saving drafts at all. We also don't save
         // drafts if a message is about to be sent (delayed)
-        if (mReplyText != null && mConversation != null && mConversation.getThreadId() != DemoConversationCursorLoader.THREAD_ID_WELCOME_SCREEN &&
-                mButtonState != SendButtonState.CANCEL) {
+        if (mReplyText != null && mButtonState != SendButtonState.CANCEL) {
             String draft = mReplyText.getText().toString();
 
-            if (mConversationLegacy.hasDraft() && TextUtils.isEmpty(draft)) {
-                mConversationLegacy.clearDrafts();
+            if (mConversation != null) {
+                if (mConversationLegacy.hasDraft() && TextUtils.isEmpty(draft)) {
+                    mConversationLegacy.clearDrafts();
 
-            } else if (!TextUtils.isEmpty(draft) &&
-                    (!mConversationLegacy.hasDraft() ||
-                            !draft.equals(mConversationLegacy.getDraft()))) {
-                mConversationLegacy.saveDraft(draft);
+                } else if (!TextUtils.isEmpty(draft) &&
+                        (!mConversationLegacy.hasDraft() || !draft.equals(mConversationLegacy.getDraft()))) {
+                    mConversationLegacy.saveDraft(draft);
+                }
+            } else {
+                String oldDraft = mPrefs.getString(QKPreference.COMPOSE_DRAFT.getKey(), "");
+                if (!draft.equals(oldDraft)) {
+                    mPrefs.edit().putString(QKPreference.COMPOSE_DRAFT.getKey(), draft).apply();
+
+                    // Only show the draft if we saved text, not if we just cleared some
+                    if (!TextUtils.isEmpty(draft)) {
+                        Toast.makeText(mContext, R.string.toast_draft, Toast.LENGTH_SHORT).show();
+                    }
+                }
             }
         }
 
@@ -765,6 +779,10 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
                 mReplyText.setText("");
                 clearAttachment();
             }
+        } else {
+            String draft = mPrefs.getString(QKPreference.COMPOSE_DRAFT.getKey(), "");
+            mReplyText.setText(draft);
+            mReplyText.setSelection(draft.length());
         }
     }
 
@@ -953,26 +971,9 @@ public class ComposeView extends LinearLayout implements View.OnClickListener, L
         }
     }
 
-    @Override
-    public void refresh() {
-        mButtonBackground.setColorFilter(ThemeManager.getColor(), PorterDuff.Mode.MULTIPLY);
-        mButtonBar1.setColorFilter(ThemeManager.getTextOnColorPrimary(), PorterDuff.Mode.MULTIPLY);
-        mButtonBar2.setColorFilter(ThemeManager.getTextOnColorPrimary(), PorterDuff.Mode.MULTIPLY);
-        mAttachmentPanel.setBackgroundColor(ThemeManager.getColor());
-        mAttach.setColorFilter(ThemeManager.getTextOnColorPrimary(), PorterDuff.Mode.MULTIPLY);
-        mCamera.setColorFilter(ThemeManager.getTextOnColorPrimary(), PorterDuff.Mode.MULTIPLY);
-        updateDelayButton();
-        mProgress.setUnfinishedStrokeColor(ThemeManager.getTextOnColorSecondary());
-        mProgress.setFinishedStrokeColor(ThemeManager.getTextOnColorPrimary());
-        if (ThemeManager.getSentBubbleRes() != 0) mReplyText.setBackgroundResource(ThemeManager.getSentBubbleRes());
-        mReplyText.getBackground().setColorFilter(ThemeManager.getNeutralBubbleColor(), PorterDuff.Mode.MULTIPLY);
-        mReplyText.refresh();
-        getBackground().setColorFilter(ThemeManager.getBackgroundColor(), PorterDuff.Mode.MULTIPLY);
-    }
-
     private void updateDelayButton() {
         mDelay.setColorFilter(mDelayedMessagingEnabled ?
                         ThemeManager.getTextOnColorPrimary() : ThemeManager.getTextOnColorSecondary(),
-                PorterDuff.Mode.MULTIPLY);
+                PorterDuff.Mode.SRC_ATOP);
     }
 }

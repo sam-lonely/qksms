@@ -5,14 +5,19 @@ import android.net.Uri;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import com.moez.QKSMS.R;
+import com.moez.QKSMS.common.LiveViewManager;
 import com.moez.QKSMS.common.google.ItemLoadedCallback;
 import com.moez.QKSMS.common.google.ThumbnailManager;
+import com.moez.QKSMS.enums.QKPreference;
 import com.moez.QKSMS.interfaces.SlideViewInterface;
+import com.moez.QKSMS.interfaces.LiveView;
 import com.moez.QKSMS.ui.base.ClickyViewHolder;
+import com.moez.QKSMS.ui.base.QKActivity;
 import com.moez.QKSMS.ui.mms.Presenter;
 import com.moez.QKSMS.ui.view.AvatarView;
 import com.moez.QKSMS.ui.view.QKTextView;
@@ -32,9 +37,7 @@ public class MessageListViewHolder extends ClickyViewHolder<MessageItem> impleme
     protected AvatarView mAvatarView;
     protected LinearLayout mMessageBlock;
     protected View mSpace;
-    // MMS only views. These are nested within ViewStubs, so we don't need to obtain a reference
-    // to them right away. We'll inflate the stub only when needed
-    protected View mMmsView;
+    protected FrameLayout mMmsView;
     protected ImageView mImageView;
     protected ImageButton mSlideShowButton;
     protected Button mDownloadButton;
@@ -43,8 +46,8 @@ public class MessageListViewHolder extends ClickyViewHolder<MessageItem> impleme
     protected ImageLoadedCallback mImageLoadedCallback;
     protected Presenter mPresenter;
 
-    public MessageListViewHolder(View view) {
-        super(view);
+    public MessageListViewHolder(QKActivity context, View view) {
+        super(context, view);
 
         mRoot = view;
         mBodyTextView = (QKTextView) view.findViewById(R.id.text_view);
@@ -55,30 +58,14 @@ public class MessageListViewHolder extends ClickyViewHolder<MessageItem> impleme
         mAvatarView = (AvatarView) view.findViewById(R.id.avatar);
         mMessageBlock = (LinearLayout) view.findViewById(R.id.message_block);
         mSpace = view.findViewById(R.id.space);
+        mMmsView = (FrameLayout) view.findViewById(R.id.mms_view);
+        mImageView = (ImageView) view.findViewById(R.id.image_view);
+        mSlideShowButton = (ImageButton) view.findViewById(R.id.play_slideshow_button);
     }
 
     protected void showMmsView(boolean visible) {
-        if (mMmsView == null) {
-            mMmsView = mRoot.findViewById(R.id.mms_view);
-            // if mMmsView is still null here, that mean the mms section hasn't been inflated
-
-            if (visible && mMmsView == null) {
-                // inflate the mms view_stub
-                View mmsStub = mRoot.findViewById(R.id.mms_layout_view_stub);
-                mmsStub.setVisibility(View.VISIBLE);
-                mMmsView = mRoot.findViewById(R.id.mms_view);
-            }
-        }
-        if (mMmsView != null) {
-            if (mImageView == null) {
-                mImageView = (ImageView) mRoot.findViewById(R.id.image_view);
-            }
-            if (mSlideShowButton == null) {
-                mSlideShowButton = (ImageButton) mRoot.findViewById(R.id.play_slideshow_button);
-            }
-            mMmsView.setVisibility(visible ? View.VISIBLE : View.GONE);
-            mImageView.setVisibility(visible ? View.VISIBLE : View.GONE);
-        }
+        mMmsView.setVisibility(visible ? View.VISIBLE : View.GONE);
+        mImageView.setVisibility(visible ? View.VISIBLE : View.GONE);
     }
 
     protected void inflateDownloadControls() {
@@ -89,15 +76,23 @@ public class MessageListViewHolder extends ClickyViewHolder<MessageItem> impleme
         }
     }
 
+    protected void setLiveViewCallback(LiveView liveViewCallback) {
+        LiveViewManager.registerView(QKPreference.THEME, this, liveViewCallback);
+    }
+
     @Override
     public void setImage(String name, Bitmap bitmap) {
-        showMmsView(true);
+        if (bitmap == null) {
+            showMmsView(false);
+        } else {
+            showMmsView(true);
 
-        try {
-            mImageView.setImageBitmap(bitmap);
-            mImageView.setVisibility(View.VISIBLE);
-        } catch (java.lang.OutOfMemoryError e) {
-            Log.e(TAG, "setImage: out of memory: ", e);
+            try {
+                mImageView.setImageBitmap(bitmap);
+                mImageView.setVisibility(View.VISIBLE);
+            } catch (java.lang.OutOfMemoryError e) {
+                Log.e(TAG, "setImage: out of memory: ", e);
+            }
         }
     }
 
@@ -215,16 +210,16 @@ public class MessageListViewHolder extends ClickyViewHolder<MessageItem> impleme
         public ImageLoadedCallback(MessageListViewHolder listItem) {
             mListItem = listItem;
             mListItem.setImage(null, null);
-            mMessageId = listItem.data.getMessageId();
+            mMessageId = listItem.mData.getMessageId();
         }
 
         public void reset(MessageListViewHolder listItem) {
-            mMessageId = listItem.data.getMessageId();
+            mMessageId = listItem.mData.getMessageId();
         }
 
         public void onItemLoaded(ThumbnailManager.ImageLoaded imageLoaded, Throwable exception) {
             // Make sure we're still pointing to the same message. The list item could have // been recycled.
-            MessageItem msgItem = mListItem.data;
+            MessageItem msgItem = mListItem.mData;
             if (msgItem != null && msgItem.getMessageId() == mMessageId) {
                 if (imageLoaded.mIsVideo) {
                     mListItem.setVideoThumbnail(null, imageLoaded.mBitmap);

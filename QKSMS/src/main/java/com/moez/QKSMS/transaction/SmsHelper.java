@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
+import android.preference.PreferenceManager;
 import android.provider.Telephony;
 import android.provider.Telephony.Sms;
 import android.telephony.SmsManager;
@@ -17,14 +18,13 @@ import com.google.android.mms.pdu_alt.CharacterSets;
 import com.google.android.mms.pdu_alt.EncodedStringValue;
 import com.google.android.mms.pdu_alt.MultimediaMessagePdu;
 import com.google.android.mms.pdu_alt.PduPersister;
-import com.moez.QKSMS.mmssms.Settings;
 import com.moez.QKSMS.MmsConfig;
 import com.moez.QKSMS.R;
 import com.moez.QKSMS.data.Conversation;
 import com.moez.QKSMS.data.Message;
+import com.moez.QKSMS.mmssms.Settings;
 import com.moez.QKSMS.model.SlideModel;
 import com.moez.QKSMS.model.SlideshowModel;
-import com.moez.QKSMS.ui.MainActivity;
 import com.moez.QKSMS.ui.messagelist.MessageColumns;
 import com.moez.QKSMS.ui.messagelist.MessageItem;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
@@ -95,8 +95,6 @@ public class SmsHelper {
     private static final String TAG = "SMSHelper";
     private static SmsManager sms;
 
-    private static Cursor cursor;
-
     private static Settings sendSettings;
 
     public SmsHelper() {
@@ -157,11 +155,6 @@ public class SmsHelper {
 
     private static String[] sNoSubjectStrings;
 
-    public static long getLastThreadId(Context context) {
-        Cursor cursor = context.getContentResolver().query(SmsHelper.RECEIVED_MESSAGE_CONTENT_PROVIDER, new String[]{COLUMN_ID}, null, null, "date DESC");
-        return (cursor != null && cursor.moveToFirst()) ? cursor.getLong(0) : 0;
-    }
-
     public static void markSmsSeen(Context context) {
         Cursor cursor = context.getContentResolver().query(RECEIVED_MESSAGE_CONTENT_PROVIDER,
                 new String[]{SmsHelper.COLUMN_ID}, SmsHelper.UNSEEN_SELECTION + " AND " + SmsHelper.UNREAD_SELECTION, null, null);
@@ -210,7 +203,7 @@ public class SmsHelper {
 
     public static Settings getSendSettings(Context context) {
         if (sendSettings == null) {
-            SharedPreferences prefs = MainActivity.getPrefs(context);
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
 
             sendSettings = new Settings();
             sendSettings.setMmsc(prefs.getString(SettingsFragment.MMSC_URL, ""));
@@ -290,7 +283,7 @@ public class SmsHelper {
     }
 
     public static int getUnseenSMSCount(Context context, long threadId) {
-
+        Cursor cursor = null;
         int count = 0;
         String selection = UNSEEN_SELECTION + " AND " + UNREAD_SELECTION + (threadId == 0 ? "" : " AND " + COLUMN_THREAD_ID + " = " + threadId);
 
@@ -301,7 +294,9 @@ public class SmsHelper {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            cursor.close();
+            if (cursor != null) {
+                cursor.close();
+            }
         }
 
         return count;
@@ -314,6 +309,7 @@ public class SmsHelper {
      */
     public static String getHistoryForWearable(Context context, String name, long threadId) {
         final String me = context.getString(R.string.me);
+        Cursor cursor = null;
         StringBuilder builder = new StringBuilder();
         MessageColumns.ColumnsMap map = new MessageColumns.ColumnsMap();
 
@@ -432,6 +428,7 @@ public class SmsHelper {
     }
 
     public static long getThreadId(Context context, String address) {
+        Cursor cursor = null;
         long threadId = 0;
 
         try {
@@ -440,67 +437,13 @@ public class SmsHelper {
             threadId = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_THREAD_ID));
         } catch (Exception e) {
             e.printStackTrace();
-        }
-
-        return threadId;
-    }
-
-    public static long getLastSentThreadId(Context context) {
-        long threadId = 0;
-
-        try {
-            cursor = context.getContentResolver().query(SENT_MESSAGE_CONTENT_PROVIDER, new String[]{COLUMN_THREAD_ID}, null, null, sortDateDesc);
-            cursor.moveToFirst();
-            threadId = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_THREAD_ID));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return threadId;
-    }
-
-    public static List<String> getUnseenMessageNames(Context context) {
-        List<Message> messages = getUnseenMessages(context);
-        List<String> names = new ArrayList<String>();
-
-        for (int i = 0; i < messages.size(); i++) {
-            if (!names.contains(messages.get(i).getName()))
-                names.add(messages.get(i).getName());
-        }
-
-        return names;
-    }
-
-    public static String getUnseenMessageText(Context context, boolean names) {
-        List<Message> messages = getUnseenMessages(context);
-        String s = "";
-
-        for (Message message : messages) {
-            if (names) s += message.getName() + ": ";
-            s += message.getBody() + "\n";
-        }
-
-        return s.substring(0, s.length() - 1);
-    }
-
-    public static List<Message> getUnseenMessages(Context context) {
-
-        List<Message> messages = new ArrayList<Message>();
-
-        try {
-            cursor = context.getContentResolver().query(RECEIVED_MESSAGE_CONTENT_PROVIDER, new String[]{COLUMN_ID}, UNSEEN_SELECTION + " AND " + UNREAD_SELECTION, null, sortDateDesc);
-            cursor.moveToFirst();
-            for (int i = 0; i < cursor.getCount(); i++) {
-                messages.add(new Message(context, cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_ID))));
-                cursor.moveToNext();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
         } finally {
-            cursor.close();
+            if (cursor != null) {
+                cursor.close();
+            }
         }
 
-        return messages;
+        return threadId;
     }
 
     public static int getUnreadMessageCount(Context context) {
@@ -515,16 +458,21 @@ public class SmsHelper {
             do {
                 Uri threadUri = Uri.withAppendedPath(Message.MMS_SMS_CONTENT_PROVIDER, conversationCursor.getString(Conversation.ID));
                 Cursor messageCursor = context.getContentResolver().query(threadUri, MessageColumns.PROJECTION, SmsHelper.UNREAD_SELECTION, null, SmsHelper.sortDateDesc);
-                result += messageCursor.getCount();
+                if (messageCursor != null) {
+                    result += messageCursor.getCount();
+                    messageCursor.close();
+                }
             } while (conversationCursor.moveToNext());
         }
+
+        conversationCursor.close();
 
         return result;
     }
 
     public static List<Message> getFailedMessages(Context context) {
-
-        List<Message> messages = new ArrayList<Message>();
+        Cursor cursor = null;
+        List<Message> messages = new ArrayList<>();
 
         try {
             cursor = context.getContentResolver().query(SMS_CONTENT_PROVIDER, new String[]{COLUMN_ID}, FAILED_SELECTION, null, sortDateDesc);
@@ -536,17 +484,18 @@ public class SmsHelper {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            cursor.close();
+            if (cursor != null) {
+                cursor.close();
+            }
         }
 
         return messages;
     }
 
     public static List<Message> deleteFailedMessages(Context context, long threadId) {
-
         Log.d(TAG, "Deleting failed messages");
-
-        List<Message> messages = new ArrayList<Message>();
+        Cursor cursor = null;
+        List<Message> messages = new ArrayList<>();
 
         try {
             cursor = context.getContentResolver().query(SMS_CONTENT_PROVIDER, new String[]{COLUMN_ID}, FAILED_SELECTION, null, sortDateDesc);
@@ -558,12 +507,13 @@ public class SmsHelper {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            cursor.close();
+            if (cursor != null) {
+                cursor.close();
+            }
         }
 
-        for (Message m : messages)
-        {
-            if(m.getThreadId() == threadId) {
+        for (Message m : messages) {
+            if (m.getThreadId() == threadId) {
                 Log.d(TAG, "Deleting failed message to " + m.getName() + "\n Body: " + m.getBody());
                 m.delete();
             }

@@ -23,20 +23,23 @@ import android.provider.Telephony;
 import android.support.v4.app.NotificationCompat;
 import android.text.Html;
 import android.util.Log;
+
 import com.android.mms.transaction.TransactionService;
 import com.android.mms.transaction.TransactionState;
 import com.google.android.mms.pdu_alt.PduHeaders;
 import com.moez.QKSMS.R;
+import com.moez.QKSMS.common.ConversationPrefsHelper;
+import com.moez.QKSMS.common.utils.ImageUtils;
 import com.moez.QKSMS.data.Contact;
 import com.moez.QKSMS.data.ContactHelper;
 import com.moez.QKSMS.data.Message;
 import com.moez.QKSMS.model.ImageModel;
 import com.moez.QKSMS.model.SlideshowModel;
 import com.moez.QKSMS.receiver.WearableIntentReceiver;
-import com.moez.QKSMS.common.ConversationPrefsHelper;
-import com.moez.QKSMS.common.utils.ImageUtils;
 import com.moez.QKSMS.ui.MainActivity;
+import com.moez.QKSMS.ui.ThemeManager;
 import com.moez.QKSMS.ui.messagelist.MessageItem;
+import com.moez.QKSMS.ui.messagelist.MessageListActivity;
 import com.moez.QKSMS.ui.popup.QKComposeActivity;
 import com.moez.QKSMS.ui.popup.QKReplyActivity;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
@@ -83,8 +86,8 @@ public class NotificationManager {
     public static void init(final Context context) {
 
         // Initialize the static shared prefs and resources.
-        sPrefs = MainActivity.getPrefs(context);
-        sRes = MainActivity.getRes(context);
+        sPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+        sRes = context.getResources();
 
         // Listen for MMS events.
         IntentFilter filter = new IntentFilter(TransactionService.TRANSACTION_COMPLETED_ACTION);
@@ -156,7 +159,7 @@ public class NotificationManager {
 
                     // If this message is in the foreground, mark it as read
                     Message message = new Message(context, lastMessage.mMsgId);
-                    if (message.isVisible()) {
+                    if (message.getThreadId() == MainActivity.sThreadShowing) {
                         message.markRead();
                         return;
                     }
@@ -182,20 +185,30 @@ public class NotificationManager {
                     }
 
                     if (conversationPrefs.getNotificationLedEnabled()) {
-                        builder.setLights(getLedColour(conversationPrefs), 1000, 1000);
+                        builder.setLights(getLedColor(conversationPrefs), 1000, 1000);
                     }
 
-                    boolean privateNotifications = conversationPrefs.getPrivateNotificationsEnabled();
+                    Integer privateNotifications = conversationPrefs.getPrivateNotificationsSetting();
 
                     if (conversationPrefs.getTickerEnabled()) {
-                        String messageBody = privateNotifications ? sRes.getString(R.string.new_message) : lastMessage.mBody;
-                        builder.setTicker(String.format("%s: %s", lastMessage.mContact, messageBody));
+                        switch (privateNotifications) {
+                            case 0:
+                                builder.setTicker(String.format("%s: %s", lastMessage.mContact, lastMessage.mBody));
+                                break;
+                            case 1:
+                                builder.setTicker(String.format("%s: %s", lastMessage.mContact, sRes.getString(R.string.new_message)));
+                                break;
+                            case 2:
+                                builder.setTicker(String.format("%s: %s", "QKSMS", sRes.getString(R.string.new_message)));
+                                break;
+                        }
                     }
 
                     if (conversationPrefs.getWakePhoneEnabled()) {
                         PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
                         PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK, "FlashActivity");
                         wl.acquire();
+                        wl.release();
                     }
 
                     if (conversations.size() == 1 && lastConversation.size() == 1) {
@@ -243,7 +256,7 @@ public class NotificationManager {
                 // If the message is visible (i.e. it is currently showing in the Main Activity),
                 // don't show a notification; just mark it as read and return.
                 Message message = new Message(context, lastMessage.mMsgId);
-                if (message.isVisible()) {
+                if (message.getThreadId() == MainActivity.sThreadShowing) {
                     message.markRead();
                     return;
                 }
@@ -263,10 +276,10 @@ public class NotificationManager {
                                 .setAutoCancel(true);
 
                 if (conversationPrefs.getNotificationLedEnabled()) {
-                    builder.setLights(getLedColour(conversationPrefs), 1000, 1000);
+                    builder.setLights(getLedColor(conversationPrefs), 1000, 1000);
                 }
 
-                boolean privateNotifications = conversationPrefs.getPrivateNotificationsEnabled();
+                Integer privateNotifications = conversationPrefs.getPrivateNotificationsSetting();
 
                 if (conversations.size() == 1 && lastConversation.size() == 1) {
                     singleMessage(context, lastConversation, threadId, builder, conversationPrefs, privateNotifications);
@@ -303,7 +316,7 @@ public class NotificationManager {
                 PendingIntent PI;
                 if (failedCursor.getCount() == 1) {
                     title = sRes.getString(R.string.failed_message);
-                    Intent intent = new Intent(context, MainActivity.class);
+                    Intent intent = new Intent(context, MessageListActivity.class);
                     intent.putExtra(MainActivity.EXTRA_THREAD_ID, failedCursor.getLong(0));
                     PI = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
                 } else {
@@ -312,11 +325,21 @@ public class NotificationManager {
                     PI = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
                 }
 
-                boolean privateNotifications = sPrefs.getBoolean(SettingsFragment.NOTIFICATION_PRIVATE, false);
+
                 NotificationCompat.InboxStyle inboxStyle = new NotificationCompat.InboxStyle();
+
                 for (Message message : SmsHelper.getFailedMessages(context)) {
-                    String body = privateNotifications ? sRes.getString(R.string.new_message) : message.getBody();
-                    inboxStyle.addLine(Html.fromHtml("<strong>" + message.getName() + "</strong> " + body));
+                    switch (Integer.parseInt(sPrefs.getString(SettingsFragment.PRIVATE_NOTIFICATION, "0"))) {
+                        case 0:
+                            inboxStyle.addLine(Html.fromHtml("<strong>" + message.getName() + "</strong> " + message.getBody()));
+                            break;
+                        case 1:
+                            inboxStyle.addLine(Html.fromHtml("<strong>" + message.getName() + "</strong> " + sRes.getString(R.string.new_message)));
+                            break;
+                        case 2:
+                            inboxStyle.addLine(Html.fromHtml("<strong>" + "QKSMS" + "</strong> " + sRes.getString(R.string.new_message)));
+                            break;
+                    }
                 }
 
                 NotificationCompat.Builder builder = new NotificationCompat.Builder(context)
@@ -337,7 +360,7 @@ public class NotificationManager {
                 }
 
                 if (sPrefs.getBoolean(SettingsFragment.NOTIFICATION_LED, true)) {
-                    builder.setLights(getLedColour(new ConversationPrefsHelper(context, 0)), 1000, 1000);
+                    builder.setLights(getLedColor(new ConversationPrefsHelper(context, 0)), 1000, 1000);
                 }
 
                 if (sPrefs.getBoolean(SettingsFragment.NOTIFICATION_TICKER, false)) {
@@ -371,7 +394,7 @@ public class NotificationManager {
      * Dismisses all old notifications. The purpose of this is to clear notifications that don't need to show up,
      * without making the remaining ones dissapear and pop up again like how NotificationMangager.cancelAll and then
      * rebuilding them would do
-     * <p/>
+     * <p>
      * This should stay private, because it assumes that the preferences have already been initialized
      */
     private static void dismissOld(Context context, HashMap<Long, ArrayList<MessageItem>> newMessages) {
@@ -411,7 +434,7 @@ public class NotificationManager {
      */
     private static void singleMessage(final Context context, final ArrayList<MessageItem> messages, final long threadId,
                                       final NotificationCompat.Builder builder, final ConversationPrefsHelper conversationPrefs,
-                                      final boolean privateNotifications) {
+                                      final Integer privateNotifications) {
 
         MessageItem message = messages.get(0);
 
@@ -442,7 +465,7 @@ public class NotificationManager {
      */
     private static void buildSingleMessageNotification(final Context context, ArrayList<MessageItem> messages, long threadId,
                                                        final NotificationCompat.Builder builder, ConversationPrefsHelper conversationPrefs,
-                                                       final boolean privateNotifications) {
+                                                       final Integer privateNotifications) {
 
         MessageItem message = messages.get(0);
 
@@ -452,7 +475,7 @@ public class NotificationManager {
         replyIntent.putExtra(QKReplyActivity.EXTRA_SHOW_KEYBOARD, true);
         final PendingIntent replyPI = PendingIntent.getActivity(context, buildRequestCode(threadId, 0), replyIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
-        Intent threadIntent = new Intent(context, MainActivity.class);
+        Intent threadIntent = new Intent(context, MessageListActivity.class);
         threadIntent.putExtra(MainActivity.EXTRA_THREAD_ID, threadId);
         final PendingIntent threadPI = PendingIntent.getActivity(context, buildRequestCode(threadId, 1), threadIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
@@ -464,16 +487,42 @@ public class NotificationManager {
         final PendingIntent seenPI = PendingIntent.getBroadcast(context, buildRequestCode(threadId, 4), seenIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         int unreadMessageCount = SmsHelper.getUnreadMessageCount(context);
-        builder.setContentTitle(message.mContact)
-                .setContentText(privateNotifications ? sRes.getString(R.string.new_message) : message.mBody)
-                .setLargeIcon(getLargeIcon(context, Contact.get(message.mAddress, false)))
+        String body;
+        String title;
+        NotificationCompat.Style nstyle = null;
+        switch (privateNotifications) {
+            case 0: //Hide nothing
+                body = message.mBody;
+                title = message.mContact;
+                nstyle = new NotificationCompat.BigTextStyle().bigText(message.mBody);
+                break;
+            case 1: //Hide message
+                body = sRes.getString(R.string.new_message);
+                title = message.mContact;
+                break;
+            case 2: //Hide sender & message
+                body = sRes.getString(R.string.new_message);
+                title = "QKSMS";
+                break;
+            default:
+                body = message.mBody;
+                title = message.mContact;
+                nstyle = null;
+        }
+
+        builder.setContentTitle(title)
+                .setContentText(body)
+                .setLargeIcon(getLargeIcon(context, Contact.get(message.mAddress, false), privateNotifications))
                 .setContentIntent(threadPI)
                 .setNumber(unreadMessageCount)
-                .setStyle(privateNotifications ? null : new NotificationCompat.BigTextStyle().bigText(message.mBody))
+                .setStyle(nstyle)
                 .addAction(R.drawable.ic_reply, sRes.getString(R.string.reply), replyPI)
                 .addAction(R.drawable.ic_accept, sRes.getString(R.string.read), readPI)
                 .extend(WearableIntentReceiver.getSingleConversationExtender(context, message.mContact, message.mAddress, threadId))
                 .setDeleteIntent(seenPI);
+        if (conversationPrefs.getDimissedReadEnabled()) {
+            builder.setDeleteIntent(readPI);
+        }
 
         if (conversationPrefs.getCallButtonEnabled()) {
             Intent callIntent = new Intent(Intent.ACTION_CALL);
@@ -487,23 +536,23 @@ public class NotificationManager {
 
             SlideshowModel model = message.mSlideshow;
 
-            if (model != null && model.isSimple()) {
+            if (model != null && model.isSimple() && model.get(0).getImage() != null) {
                 Log.d(TAG, "MMS type: image");
                 ImageModel imageModel = model.get(0).getImage();
                 Bitmap image = imageModel.getBitmap(imageModel.getWidth(), imageModel.getHeight());
                 NotificationCompat.BigPictureStyle style = new NotificationCompat.BigPictureStyle()
                         .setBigContentTitle(message.mContact)
                         .setSummaryText(message.mBody)
-                        .bigLargeIcon(getLargeIcon(context, Contact.get(message.mAddress, false)))
+                        .bigLargeIcon(getLargeIcon(context, Contact.get(message.mAddress, false), privateNotifications))
                         .bigPicture(image);
+                if (privateNotifications == 0) builder.setStyle(style);
+                else builder.setStyle(null);
 
-                builder.setStyle(privateNotifications ? null : style);
             } else {
                 Log.d(TAG, "MMS Type: not an image lol");
-                NotificationCompat.BigTextStyle style = privateNotifications ?
-                        null : new NotificationCompat.BigTextStyle().bigText(message.mBody);
-
-                builder.setStyle(style);
+                if (privateNotifications == 0)
+                    builder.setStyle(new NotificationCompat.BigTextStyle().bigText(message.mBody));
+                else builder.setStyle(null);
             }
 
         }
@@ -516,7 +565,7 @@ public class NotificationManager {
      */
     private static void singleSender(final Context context, ArrayList<MessageItem> messages, long threadId,
                                      final NotificationCompat.Builder builder, ConversationPrefsHelper conversationPrefs,
-                                     final boolean privateNotifications) {
+                                     final Integer privateNotifications) {
 
         MessageItem message = messages.get(0);
 
@@ -526,7 +575,7 @@ public class NotificationManager {
         replyIntent.putExtra(QKReplyActivity.EXTRA_SHOW_KEYBOARD, true);
         PendingIntent replyPI = PendingIntent.getActivity(context, buildRequestCode(threadId, 0), replyIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
-        Intent threadIntent = new Intent(context, MainActivity.class);
+        Intent threadIntent = new Intent(context, MessageListActivity.class);
         threadIntent.putExtra(MainActivity.EXTRA_THREAD_ID, threadId);
         PendingIntent threadPI = PendingIntent.getActivity(context, buildRequestCode(threadId, 1), threadIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
@@ -542,13 +591,18 @@ public class NotificationManager {
             inboxStyle.addLine(message1.mBody);
         }
 
+        String notificationTitle = message.mContact;
+
+        if (!(privateNotifications == 0)) inboxStyle = null;
+        if (privateNotifications == 2) notificationTitle = "QKSMS";
+
         int unreadMessageCount = SmsHelper.getUnreadMessageCount(context);
-        builder.setContentTitle(message.mContact)
+        builder.setContentTitle(notificationTitle)
                 .setContentText(SmsHelper.getUnseenSMSCount(context, threadId) + " " + sRes.getString(R.string.new_messages))
-                .setLargeIcon(getLargeIcon(context, Contact.get(message.mAddress, false)))
+                .setLargeIcon(getLargeIcon(context, Contact.get(message.mAddress, false), privateNotifications))
                 .setContentIntent(threadPI)
                 .setNumber(unreadMessageCount)
-                .setStyle(privateNotifications ? null : inboxStyle)
+                .setStyle(inboxStyle)
                 .addAction(R.drawable.ic_reply, sRes.getString(R.string.reply), replyPI)
                 .addAction(R.drawable.ic_accept, sRes.getString(R.string.read), readPI)
                 .extend(WearableIntentReceiver.getSingleConversationExtender(context, message.mContact, message.mAddress, threadId))
@@ -579,10 +633,11 @@ public class NotificationManager {
         for (long threadId : threadIds) {
             if (!oldThreads.contains(threadId)) {
                 ConversationPrefsHelper conversationPrefs = new ConversationPrefsHelper(context, threadId);
+                Integer privateNotification = conversationPrefs.getPrivateNotificationsSetting();
                 if (conversations.get(threadId).size() == 1) {
-                    singleMessage(context, conversations.get(threadId), threadId, copyBuilder(builder), conversationPrefs, false);
+                    singleMessage(context, conversations.get(threadId), threadId, copyBuilder(builder), conversationPrefs, privateNotification);
                 } else {
-                    singleSender(context, conversations.get(threadId), threadId, copyBuilder(builder), conversationPrefs, false);
+                    singleSender(context, conversations.get(threadId), threadId, copyBuilder(builder), conversationPrefs, privateNotification);
                 }
             }
         }
@@ -611,6 +666,10 @@ public class NotificationManager {
      */
     public static void initQuickCompose(Context context, boolean override, boolean overrideCancel) {
 
+        if (sPrefs == null) {
+            init(context);
+        }
+
         if (sPrefs.getBoolean(SettingsFragment.QUICKCOMPOSE, false) || override) {
             Intent composeIntent = new Intent(context, QKComposeActivity.class);
             PendingIntent composePI = PendingIntent.getActivity(context, 9, composeIntent, PendingIntent.FLAG_UPDATE_CURRENT);
@@ -620,9 +679,9 @@ public class NotificationManager {
                     .setContentText(sRes.getString(R.string.quickcompose_detail))
                     .setOngoing(true)
                     .setContentIntent(composePI)
-                    .setSmallIcon(R.drawable.blank)
+                    .setSmallIcon(R.drawable.ic_compose)
                     .setPriority(NotificationCompat.PRIORITY_MIN)
-                    .setLargeIcon(BitmapFactory.decodeResource(sRes, R.drawable.ic_compose));
+                    .setColor(ThemeManager.getColor());
 
             NotificationManager.notify(context, NOTIFICATION_ID_QUICKCOMPOSE, builder.build());
         } else {
@@ -634,18 +693,18 @@ public class NotificationManager {
         }
     }
 
-    private static int getLedColour(ConversationPrefsHelper conversationPrefs) {
-        int colour = Integer.parseInt(conversationPrefs.getNotificationLedColor());
+    private static int getLedColor(ConversationPrefsHelper conversationPrefs) {
+        int color = Integer.parseInt(conversationPrefs.getNotificationLedColor());
 
-        if (colour == sRes.getColor(R.color.blue_light) || colour == sRes.getColor(R.color.blue_dark))
+        if (color == sRes.getColor(R.color.blue_light) || color == sRes.getColor(R.color.blue_dark))
             return sRes.getColor(R.color.blue_dark);
-        if (colour == sRes.getColor(R.color.purple_light) || colour == sRes.getColor(R.color.purple_dark))
+        if (color == sRes.getColor(R.color.purple_light) || color == sRes.getColor(R.color.purple_dark))
             return sRes.getColor(R.color.purple_dark);
-        if (colour == sRes.getColor(R.color.green_light) || colour == sRes.getColor(R.color.green_dark))
+        if (color == sRes.getColor(R.color.green_light) || color == sRes.getColor(R.color.green_dark))
             return sRes.getColor(R.color.green_dark);
-        if (colour == sRes.getColor(R.color.yellow_light) || colour == sRes.getColor(R.color.yellow_dark))
+        if (color == sRes.getColor(R.color.yellow_light) || color == sRes.getColor(R.color.yellow_dark))
             return sRes.getColor(R.color.yellow_dark);
-        if (colour == sRes.getColor(R.color.red_light) || colour == sRes.getColor(R.color.red_dark))
+        if (color == sRes.getColor(R.color.red_light) || color == sRes.getColor(R.color.red_dark))
             return sRes.getColor(R.color.red_dark);
 
         return sRes.getColor(R.color.white_pure);
@@ -655,17 +714,21 @@ public class NotificationManager {
      * Retreives the avatar to be used for the notification's large icon. If the user is running Lollipop, then let's
      * crop their avatar to a circle
      */
-    private static Bitmap getLargeIcon(Context context, Contact contact) {
+    private static Bitmap getLargeIcon(Context context, Contact contact, Integer privateNotification) {
         Drawable avatarDrawable = contact.getAvatar(context, new BitmapDrawable(sRes, ContactHelper.blankContact(context, contact.getName())));
         int idealIconWidth = sRes.getDimensionPixelSize(android.R.dimen.notification_large_icon_width);
         int idealIconHeight = sRes.getDimensionPixelSize(android.R.dimen.notification_large_icon_height);
 
         Bitmap bitmap = Bitmap.createScaledBitmap(((BitmapDrawable) avatarDrawable).getBitmap(), idealIconWidth, idealIconHeight, true);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            return ImageUtils.getCircleBitmap(bitmap, idealIconWidth);
+        if (privateNotification == 2) {
+            return null;
         } else {
-            return bitmap;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                return ImageUtils.getCircleBitmap(bitmap, idealIconWidth);
+            } else {
+                return bitmap;
+            }
         }
     }
 

@@ -4,8 +4,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
 import android.util.Log;
-import com.moez.QKSMS.ui.MainActivity;
 import com.moez.QKSMS.ui.ThemeManager;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
 
@@ -19,8 +19,7 @@ public class NightModeAutoReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        ThemeManager.loadThemeProperties(context);
-        SharedPreferences prefs = MainActivity.getPrefs(context);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
 
         if (prefs.getBoolean(SettingsFragment.NIGHT_AUTO, false)) {
             Calendar calendar = Calendar.getInstance();
@@ -42,11 +41,11 @@ public class NightModeAutoReceiver extends BroadcastReceiver {
                     (calendar.get(Calendar.HOUR_OF_DAY) == day.get(Calendar.HOUR_OF_DAY) && calendar.get(Calendar.MINUTE) <= day.get(Calendar.MINUTE))) {
                 Log.i(TAG, "Switching to night mode");
                 prefs.edit().putString(SettingsFragment.BACKGROUND, ThemeManager.Theme.PREF_GREY).apply();
-                ThemeManager.setTheme(ThemeManager.Theme.GREY);
+                ThemeManager.setTheme(ThemeManager.Theme.DARK);
             } else {
                 Log.i(TAG, "Switching to day mode");
                 prefs.edit().putString(SettingsFragment.BACKGROUND, ThemeManager.Theme.PREF_OFFWHITE).apply();
-                ThemeManager.setTheme(ThemeManager.Theme.OFFWHITE);
+                ThemeManager.setTheme(ThemeManager.Theme.LIGHT);
             }
         }
     }

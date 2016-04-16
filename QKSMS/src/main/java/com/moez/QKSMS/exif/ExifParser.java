@@ -176,7 +176,7 @@ public class ExifParser {
     private static final short TAG_STRIP_BYTE_COUNTS = ExifInterface
             .getTrueTagKey(ExifInterface.TAG_STRIP_BYTE_COUNTS);
 
-    private final TreeMap<Integer, Object> mCorrespondingEvent = new TreeMap<Integer, Object>();
+    private final TreeMap<Integer, Object> mCorrespondingEvent = new TreeMap<>();
 
     private boolean isIfdRequested(int ifdType) {
         switch (ifdType) {
@@ -636,10 +636,7 @@ public class ExifParser {
 
     private boolean checkAllowed(int ifd, int tagId) {
         int info = mInterface.getTagInfo().get(tagId);
-        if (info == ExifInterface.DEFINITION_NULL) {
-            return false;
-        }
-        return ExifInterface.isIfdAllowed(info, ifd);
+        return info != ExifInterface.DEFINITION_NULL && ExifInterface.isIfdAllowed(info, ifd);
     }
 
     protected void readFullTagValue(ExifTag tag) throws IOException {

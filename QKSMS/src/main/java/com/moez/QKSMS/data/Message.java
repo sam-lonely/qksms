@@ -7,7 +7,6 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import com.moez.QKSMS.R;
 import com.moez.QKSMS.transaction.SmsHelper;
-import com.moez.QKSMS.ui.MainActivity;
 import com.moez.QKSMS.ui.dialog.DefaultSmsHelper;
 
 public class Message {
@@ -82,12 +81,12 @@ public class Message {
     }
 
     public boolean isMms() {
-        boolean bool = false;
+        boolean isMms = false;
         Cursor cursor = null;
         try {
             cursor = context.getContentResolver().query(MMS_SMS_CONTENT_PROVIDER, new String[]{SmsHelper.COLUMN_MMS}, "_id=" + id, null, null);
             cursor.moveToFirst();
-            bool = "application/vnd.wap.multipart.related".equals(cursor.getString(cursor.getColumnIndex(SmsHelper.COLUMN_MMS)));
+            isMms = "application/vnd.wap.multipart.related".equals(cursor.getString(cursor.getColumnIndex(SmsHelper.COLUMN_MMS)));
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -95,7 +94,7 @@ public class Message {
                 cursor.close();
             }
         }
-        return bool;
+        return isMms;
     }
 
     public String getAddress() {
@@ -151,12 +150,6 @@ public class Message {
         return photoBitmap;
     }
 
-    public boolean isVisible() {
-       return getThreadId() == MainActivity.threadId &&
-               MainActivity.isShowing &&
-               !MainActivity.isContentHidden;
-    }
-
     public void markSeen() {
         ContentValues cv = new ContentValues();
         cv.put("seen", true);
@@ -181,7 +174,7 @@ public class Message {
     }
 
     public void delete() {
-        new DefaultSmsHelper(context, null, R.string.not_default_delete).showIfNotDefault(null);
+        new DefaultSmsHelper(context, R.string.not_default_delete).showIfNotDefault(null);
 
         try {
             if (isMms()) {

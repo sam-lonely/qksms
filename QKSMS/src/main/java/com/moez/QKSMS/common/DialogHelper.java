@@ -1,96 +1,148 @@
 package com.moez.QKSMS.common;
 
 import android.util.Log;
-import android.view.View;
+import com.android.volley.toolbox.StringRequest;
+import com.google.gson.Gson;
+import com.moez.QKSMS.BuildConfig;
 import com.moez.QKSMS.R;
 import com.moez.QKSMS.data.Conversation;
+import com.moez.QKSMS.model.ChangeModel;
 import com.moez.QKSMS.transaction.SmsHelper;
 import com.moez.QKSMS.ui.MainActivity;
-import com.moez.QKSMS.ui.conversationlist.ConversationListAdapter;
+import com.moez.QKSMS.ui.base.QKActivity;
 import com.moez.QKSMS.ui.dialog.DefaultSmsHelper;
 import com.moez.QKSMS.ui.dialog.QKDialog;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 
 public class DialogHelper {
     private static final String TAG = "DialogHelper";
 
     public static void showDeleteConversationDialog(MainActivity context, long threadId) {
-        List<Long> threadIds = new ArrayList<Long>();
+        Set<Long> threadIds = new HashSet<>();
         threadIds.add(threadId);
-        showDeleteConversationDialog(context, threadIds);
+        showDeleteConversationsDialog(context, threadIds);
     }
 
-    public static void showDeleteFailedMessagesDialog(final MainActivity context, final long threadId) {
-        new DefaultSmsHelper(context, null, R.string.not_default_delete).showIfNotDefault(null);
+    public static void showDeleteConversationsDialog(final MainActivity context, final Set<Long> threadIds) {
+        new DefaultSmsHelper(context, R.string.not_default_delete).showIfNotDefault(null);
 
+        Set<Long> threads = new HashSet<>(threadIds); // Make a copy so the list isn't reset when multi-select is disabled
+        new QKDialog()
+                .setContext(context)
+                .setTitle(R.string.delete_conversation)
+                .setMessage(context.getString(R.string.delete_confirmation, threads.size()))
+                .setPositiveButton(R.string.yes, v -> {
+                    Log.d(TAG, "Deleting threads: " + Arrays.toString(threads.toArray()));
+                    Conversation.ConversationQueryHandler handler = new Conversation.ConversationQueryHandler(context.getContentResolver());
+                    Conversation.startDelete(handler, 0, false, threads);
+                    Conversation.asyncDeleteObsoleteThreads(handler, 0);
+                    context.showMenu();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+
+    }
+
+    public static void showDeleteFailedMessagesDialog(final MainActivity context, final Set<Long> threadIds) {
+        new DefaultSmsHelper(context, R.string.not_default_delete).showIfNotDefault(null);
+
+        Set<Long> threads = new HashSet<>(threadIds); // Make a copy so the list isn't reset when multi-select is disabled
         new QKDialog()
                 .setContext(context)
                 .setTitle(R.string.delete_all_failed)
-                .setMessage(R.string.delete_all_failed_confirmation)
-                .setPositiveButton(R.string.yes, new View.OnClickListener() {
-
-                    @Override
-                    public void onClick(View v) {
-                        new Thread(new Runnable() {
-                            public void run() {
-                                SmsHelper.deleteFailedMessages(context, threadId);
-                            }
-                        }).start();
-                    }
-                }).setNegativeButton(R.string.cancel, null)
-                .show(context.getFragmentManager(), QKDialog.CONFIRMATION_TAG);
+                .setMessage(context.getString(R.string.delete_all_failed_confirmation, threads.size()))
+                .setPositiveButton(R.string.yes, v -> {
+                    new Thread(() -> {
+                        for (long threadId : threads) {
+                            SmsHelper.deleteFailedMessages(context, threadId);
+                        }
+                    }).start();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
-    public static void showDeleteConversationDialog(final MainActivity context, final List<Long> threadIds) {
+    public static void showChangelog(QKActivity context) {
+        context.showProgressDialog();
 
-        new DefaultSmsHelper(context, null, R.string.not_default_delete).showIfNotDefault(null);
+        String url = "https://qksms-changelog.firebaseio.com/changes.json";
 
-        new QKDialog()
-                .setContext(context)
-                .setTitle(R.string.delete_conversation)
-                .setMessage(R.string.delete_confirmation)
-                .setPositiveButton(R.string.yes, new View.OnClickListener() {
+        StringRequest request = new StringRequest(url, response -> {
+            Gson gson = new Gson();
+            ChangeModel[] changes = gson.fromJson(response, ChangeModel[].class);
 
-                    @Override
-                    public void onClick(View v) {
-                        Log.d(TAG, "Deleting threads: " + Arrays.toString(threadIds.toArray()));
-                        Conversation.ConversationQueryHandler handler = new Conversation.ConversationQueryHandler(context.getContentResolver());
-
-                        Conversation.startDelete(handler, 0, false, threadIds);
-                        Conversation.asyncDeleteObsoleteThreads(handler, 0);
-                        context.showMenu();
+            // Fill in the localized date strings, and the `Long` time so that we can sort them
+            SimpleDateFormat dateParser = new SimpleDateFormat("yyyy-MM-dd");
+            SimpleDateFormat dateRevisionParser = new SimpleDateFormat("yyyy-MM-dd-'r'H"); // For multiple updates in a day
+            SimpleDateFormat dateFormatter = new SimpleDateFormat("MMMM d, yyyy");
+            for (ChangeModel change : changes) {
+                try {
+                    Date date;
+                    if (change.getDate().length() > 11) {
+                        date = dateRevisionParser.parse(change.getDate());
+                    } else {
+                        date = dateParser.parse(change.getDate());
                     }
-                }).setNegativeButton(R.string.cancel, null)
-                .show(context.getFragmentManager(), QKDialog.CONFIRMATION_TAG);
 
-    }
+                    change.setDate(dateFormatter.format(date));
+                    change.setDateLong(date.getTime());
+                } catch (ParseException e) {
+                    e.printStackTrace();
+                }
+            }
 
-    public static void showDeleteConversationsDialog(MainActivity context, final ConversationListAdapter adapter) {
+            Arrays.sort(changes, (lhs, rhs) -> Long.valueOf(rhs.getDateLong()).compareTo(lhs.getDateLong()));
 
-        new DefaultSmsHelper(context, null, R.string.not_default_delete).showIfNotDefault(null);
+            // Only show changelogs for current and past versions
+            boolean currentVersionReached = false;
+            ArrayList<String> versions = new ArrayList<>();
+            ArrayList<String> dates = new ArrayList<>();
+            ArrayList<String> changelists = new ArrayList<>();
+            for (ChangeModel change : changes) {
+                if (change.getVersion().equals(BuildConfig.VERSION_NAME)) {
+                    currentVersionReached = true;
+                }
 
+                if (currentVersionReached) {
+                    versions.add(change.getVersion());
+                    dates.add(change.getDate());
 
-        final Conversation.ConversationQueryHandler handler = new Conversation.ConversationQueryHandler(context.getContentResolver());
-        final ArrayList<Long> threadIds = adapter.getSelectedItems();
-
-        new QKDialog()
-                .setContext(context)
-                .setTitle(R.string.delete_conversation)
-                .setMessage(R.string.delete_confirmation)
-                .setPositiveButton(R.string.yes, new View.OnClickListener() {
-
-                    @Override
-                    public void onClick(View v) {
-                        Log.d(TAG, "Deleting threads: " + Arrays.toString(threadIds.toArray()));
-                        Conversation.startDelete(handler, 0, false, threadIds);
-                        Conversation.asyncDeleteObsoleteThreads(handler, 0);
-                        adapter.disableMultiSelectMode(true);
+                    String changelist = "";
+                    for (int i = 0; i < change.getChanges().size(); i++) {
+                        String changeItem = change.getChanges().get(i);
+                        changelist += " • ";
+                        changelist += changeItem;
+                        if (i < change.getChanges().size() - 1) {
+                            changelist += "\n";
+                        }
                     }
-                }).setNegativeButton(R.string.cancel, null)
-                .show(context.getFragmentManager(), QKDialog.CONFIRMATION_TAG);
+                    changelists.add(changelist);
+                }
+            }
+
+            context.hideProgressDialog();
+
+            new QKDialog()
+                    .setContext(context)
+                    .setTitle(R.string.title_changelog)
+                    .setTripleLineItems(
+                            versions.toArray(new String[versions.size()]),
+                            dates.toArray(new String[versions.size()]),
+                            changelists.toArray(new String[versions.size()]), null)
+                    .show();
+        }, error -> {
+            context.hideProgressDialog();
+            context.makeToast(R.string.toast_changelog_error);
+        });
+
+        context.getRequestQueue().add(request);
     }
 
 }

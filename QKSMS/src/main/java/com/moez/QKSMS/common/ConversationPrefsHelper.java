@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.preference.PreferenceManager;
 import com.moez.QKSMS.R;
+import com.moez.QKSMS.ui.ThemeManager;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
 
 public class ConversationPrefsHelper {
@@ -19,6 +20,10 @@ public class ConversationPrefsHelper {
         mContext = context;
         mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
         mConversationPrefs = context.getSharedPreferences(CONVERSATIONS_FILE + threadId, Context.MODE_PRIVATE);
+    }
+
+    public int getColor() {
+        return Integer.parseInt(mConversationPrefs.getString(SettingsFragment.THEME, "" + ThemeManager.getThemeColor()));
     }
 
     public boolean getNotificationsEnabled() {
@@ -41,8 +46,8 @@ public class ConversationPrefsHelper {
         return getBoolean(SettingsFragment.NOTIFICATION_TICKER, true);
     }
 
-    public boolean getPrivateNotificationsEnabled() {
-        return getBoolean(SettingsFragment.NOTIFICATION_PRIVATE, false);
+    public Integer getPrivateNotificationsSetting(){
+        return Integer.parseInt(mPrefs.getString(SettingsFragment.PRIVATE_NOTIFICATION, "0"));
     }
 
     public boolean getVibrateEnabled() {
@@ -59,6 +64,19 @@ public class ConversationPrefsHelper {
 
     public boolean getCallButtonEnabled() {
         return getBoolean(SettingsFragment.NOTIFICATION_CALL_BUTTON, false);
+    }
+
+    public boolean getDimissedReadEnabled() {
+        return getBoolean(SettingsFragment.DISMISSED_READ, false);
+    }
+
+    public void putInt(String key, int value) {
+        mConversationPrefs.edit().putInt(key, value).apply();
+    }
+
+    public int getInt(String key, int defaultValue) {
+        int globalValue = mPrefs.getInt(key, defaultValue);
+        return mConversationPrefs.getInt(key, globalValue);
     }
 
     public void putString(String key, String value) {
@@ -80,6 +98,6 @@ public class ConversationPrefsHelper {
     }
 
     public SharedPreferences getConversationPrefs() {
-        return mPrefs;
+        return mConversationPrefs;
     }
 }

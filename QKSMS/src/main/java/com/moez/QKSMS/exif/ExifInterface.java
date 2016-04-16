@@ -322,7 +322,7 @@ public class ExifInterface {
      * Tags that contain offset markers. These are included in the banned
      * defines.
      */
-    private static HashSet<Short> sOffsetTags = new HashSet<Short>();
+    private static HashSet<Short> sOffsetTags = new HashSet<>();
     static {
         sOffsetTags.add(getTrueTagKey(TAG_GPS_IFD));
         sOffsetTags.add(getTrueTagKey(TAG_EXIF_IFD));
@@ -334,7 +334,7 @@ public class ExifInterface {
     /**
      * Tags with definitions that cannot be overridden (banned defines).
      */
-    protected static HashSet<Short> sBannedDefines = new HashSet<Short>(sOffsetTags);
+    protected static HashSet<Short> sBannedDefines = new HashSet<>(sOffsetTags);
     static {
         sBannedDefines.add(getTrueTagKey(TAG_NULL));
         sBannedDefines.add(getTrueTagKey(TAG_JPEG_INTERCHANGE_FORMAT_LENGTH));
@@ -1247,7 +1247,7 @@ public class ExifInterface {
         if (l == null || l.length <= 0) {
             return null;
         }
-        return new Long(l[0]);
+        return Long.valueOf(l[0]);
     }
 
     /**
@@ -1266,7 +1266,7 @@ public class ExifInterface {
         if (l == null || l.length <= 0) {
             return null;
         }
-        return new Integer(l[0]);
+        return Integer.valueOf(l[0]);
     }
 
     /**
@@ -1285,7 +1285,7 @@ public class ExifInterface {
         if (l == null || l.length <= 0) {
             return null;
         }
-        return new Byte(l[0]);
+        return Byte.valueOf(l[0]);
     }
 
     /**
@@ -1400,10 +1400,7 @@ public class ExifInterface {
     public boolean isTagCountDefined(int tagId) {
         int info = getTagInfo().get(tagId);
         // No value in info can be zero, as all tags have a non-zero type
-        if (info == 0) {
-            return false;
-        }
-        return getComponentCountFromInfo(info) != ExifTag.SIZE_UNDEFINED;
+        return info != 0 && getComponentCountFromInfo(info) != ExifTag.SIZE_UNDEFINED;
     }
 
     /**
@@ -1550,10 +1547,7 @@ public class ExifInterface {
      */
     public boolean setTagValue(int tagId, int ifdId, Object val) {
         ExifTag t = getTag(tagId, ifdId);
-        if (t == null) {
-            return false;
-        }
-        return t.setValue(val);
+        return t != null && t.setValue(val);
     }
 
     /**
@@ -1829,10 +1823,7 @@ public class ExifInterface {
      */
     public boolean setCompressedThumbnail(Bitmap thumb) {
         ByteArrayOutputStream thumbnail = new ByteArrayOutputStream();
-        if (!thumb.compress(Bitmap.CompressFormat.JPEG, 90, thumbnail)) {
-            return false;
-        }
-        return setCompressedThumbnail(thumbnail.toByteArray());
+        return thumb.compress(Bitmap.CompressFormat.JPEG, 90, thumbnail) && setCompressedThumbnail(thumbnail.toByteArray());
     }
 
     /**
@@ -2350,7 +2341,7 @@ public class ExifInterface {
     protected static int[] getAllowedIfdsFromInfo(int info) {
         int ifdFlags = getAllowedIfdFlagsFromInfo(info);
         int[] ifds = IfdData.getIfds();
-        ArrayList<Integer> l = new ArrayList<Integer>();
+        ArrayList<Integer> l = new ArrayList<>();
         for (int i = 0; i < IfdId.TYPE_IFD_COUNT; i++) {
             int flag = (ifdFlags >> i) & 1;
             if (flag == 1) {

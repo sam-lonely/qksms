@@ -2,22 +2,24 @@ package com.moez.QKSMS.ui.view;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.TypedArray;
 import android.os.Build;
+import android.preference.PreferenceManager;
 import android.text.Layout;
 import android.text.SpannableStringBuilder;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.widget.TextView;
-import com.moez.QKSMS.interfaces.LiveView;
+import com.moez.QKSMS.R;
 import com.moez.QKSMS.common.FontManager;
 import com.moez.QKSMS.common.LiveViewManager;
 import com.moez.QKSMS.common.TypefaceManager;
-import com.moez.QKSMS.common.utils.MessageUtils;
-import com.moez.QKSMS.ui.MainActivity;
+import com.moez.QKSMS.enums.QKPreference;
+import com.moez.QKSMS.common.utils.TextUtils;
 import com.moez.QKSMS.ui.ThemeManager;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
 
-public class QKTextView extends TextView implements LiveView {
+public class QKTextView extends TextView {
     private final String TAG = "QKTextView";
 
     private Context mContext;
@@ -51,30 +53,45 @@ public class QKTextView extends TextView implements LiveView {
     private void init(Context context, AttributeSet attrs) {
         mContext = context;
 
+
         if (attrs != null) {
-            for (int i = 0; i < attrs.getAttributeCount(); i++) {
-                if (attrs.getAttributeName(i).equals("type")) {
-                    mType = Integer.decode(attrs.getAttributeValue(i));
-                    break;
-                }
-            }
+            final TypedArray array = context.obtainStyledAttributes(attrs, R.styleable.QKTextView);
+            mType = array.getInt(R.styleable.QKTextView_type, FontManager.TEXT_TYPE_PRIMARY);
+            array.recycle();
         }
 
-        refresh();
+        setTextColor(FontManager.getTextColor(mContext, mType));
         setText(getText());
 
-        // Register this view for live updates.
-        LiveViewManager.registerView(this);
-        LiveViewManager.registerPreference(this, SettingsFragment.FONT_FAMILY);
-        LiveViewManager.registerPreference(this, SettingsFragment.FONT_SIZE);
-        LiveViewManager.registerPreference(this, SettingsFragment.FONT_WEIGHT);
-        LiveViewManager.registerPreference(this, SettingsFragment.MARKDOWN_ENABLED);
-        LiveViewManager.registerPreference(this, SettingsFragment.BACKGROUND);
+        setType(mType);
+    }
+
+    public void setType(int type) {
+        mType = type;
 
         // Register for theme updates if we're text that changes color dynamically.
         if (mType == FontManager.TEXT_TYPE_CATEGORY) {
-            LiveViewManager.registerPreference(this, SettingsFragment.THEME);
+            LiveViewManager.registerView(QKPreference.THEME, this, key ->
+                    setTextColor(FontManager.getTextColor(mContext, mType)));
         }
+
+        LiveViewManager.registerView(key -> {
+            int fontFamily = FontManager.getFontFamily(mContext);
+            int fontWeight = FontManager.getFontWeight(mContext, FontManager.getIsFontHeavy(mType));
+            setTypeface(TypefaceManager.obtainTypeface(mContext, fontFamily, fontWeight));
+        }, QKPreference.FONT_FAMILY, QKPreference.FONT_WEIGHT);
+
+        LiveViewManager.registerView(QKPreference.FONT_SIZE, this, key -> {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, FontManager.getTextSize(mContext, mType));
+        });
+
+        LiveViewManager.registerView(QKPreference.BACKGROUND, this, key -> {
+            setTextColor(FontManager.getTextColor(mContext, mType));
+        });
+
+        LiveViewManager.registerView(QKPreference.TEXT_FORMATTING, this, key -> {
+            setText(getText(), BufferType.NORMAL);
+        });
     }
 
     @Override
@@ -124,22 +141,17 @@ public class QKTextView extends TextView implements LiveView {
         }
     }
 
-    public void setType(int type) {
-        mType = type;
-        refresh();
-    }
-
     @Override
     public void setText(CharSequence text, BufferType type) {
 
-        SharedPreferences prefs = MainActivity.getPrefs(getContext());
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
 
         if (mType == FontManager.TEXT_TYPE_DIALOG_BUTTON) {
             text = text.toString().toUpperCase();
         }
 
         if (prefs.getBoolean(SettingsFragment.MARKDOWN_ENABLED, false)) {
-            text = MessageUtils.styleText(text);
+            text = TextUtils.styleText(text);
             if (text == null || text.length() <= 0 || Build.VERSION.SDK_INT >= 19) {
                 super.setText(text, BufferType.EDITABLE);
                 return;
@@ -151,25 +163,5 @@ public class QKTextView extends TextView implements LiveView {
             super.setText(text, BufferType.NORMAL);
         }
 
-    }
-
-    /**
-     * refresh() is called whenever a user preference around text size, font family, etc. has been
-     * updated and the view needs to refresh its properties.
-     */
-    @Override
-    public void refresh() {
-        // Typeface
-        int fontFamily = FontManager.getFontFamily(mContext);
-        int fontWeight = FontManager.getFontWeight(mContext, FontManager.getIsFontHeavy(mType));
-        setTypeface(TypefaceManager.obtainTypeface(mContext, fontFamily, fontWeight,
-                TypefaceManager.TextStyle.NORMAL));
-
-        // Text size and color
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, FontManager.getTextSize(mContext, mType));
-        setTextColor(FontManager.getTextColor(mContext, mType));
-
-        // Markdown support enabled
-        setText(getText(), BufferType.NORMAL);
     }
 }

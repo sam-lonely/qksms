@@ -2,6 +2,7 @@ package com.moez.QKSMS.ui.dialog;
 
 import android.app.Dialog;
 import android.app.DialogFragment;
+import android.app.FragmentManager;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Color;
@@ -32,11 +33,6 @@ import java.util.ArrayList;
 
 public class QKDialog extends DialogFragment {
     private final String TAG = "QKDialog";
-
-    public static final String LIST_TAG = "list";
-    public static final String DETAILS_TAG = "details";
-    public static final String RESTART_TAG = "restart";
-    public static final String CONFIRMATION_TAG = "confirmation";
 
     protected QKActivity mContext;
     protected Resources mResources;
@@ -235,7 +231,7 @@ public class QKDialog extends DialogFragment {
     }
 
     public QKDialog buildMenu(final OnItemClickListener onItemClickListener) {
-        ArrayAdapter adapter = new ArrayAdapter<String>(mContext, R.layout.list_item_simple, mMenuItems);
+        ArrayAdapter adapter = new ArrayAdapter<>(mContext, R.layout.list_item_simple, mMenuItems);
         ListView listView = new ListView(mContext);
         listView.setAdapter(adapter);
         listView.setDivider(null);
@@ -256,7 +252,7 @@ public class QKDialog extends DialogFragment {
     }
 
     public QKDialog setItems(String[] items, final OnItemClickListener onClickListener) {
-        ArrayAdapter adapter = new ArrayAdapter<String>(mContext, R.layout.list_item_simple, items);
+        ArrayAdapter adapter = new ArrayAdapter<>(mContext, R.layout.list_item_simple, items);
         ListView listView = new ListView(mContext);
         listView.setAdapter(adapter);
         listView.setDivider(null);
@@ -461,4 +457,17 @@ public class QKDialog extends DialogFragment {
         }
     }
 
+    public void show() {
+        try {
+            super.show(mContext.getFragmentManager(), null);
+        } catch (IllegalStateException ignored) {
+            // Sometimes the context is destroyed, but the check for that is API 17+
+        }
+    }
+
+    @Deprecated
+    @Override
+    public void show(FragmentManager manager, String tag) {
+        super.show(manager, tag);
+    }
 }

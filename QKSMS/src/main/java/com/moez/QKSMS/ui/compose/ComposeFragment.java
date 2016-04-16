@@ -5,19 +5,22 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.View;
 import android.view.ViewGroup;
-
 import android.widget.AdapterView;
 import com.android.ex.chips.recipientchip.DrawableRecipientChip;
-import com.moez.QKSMS.mmssms.Utils;
 import com.moez.QKSMS.R;
-import com.moez.QKSMS.interfaces.ActivityLauncher;
-import com.moez.QKSMS.interfaces.RecipientProvider;
 import com.moez.QKSMS.common.utils.KeyboardUtils;
 import com.moez.QKSMS.common.utils.PhoneNumberUtils;
+import com.moez.QKSMS.interfaces.ActivityLauncher;
+import com.moez.QKSMS.interfaces.RecipientProvider;
+import com.moez.QKSMS.mmssms.Utils;
 import com.moez.QKSMS.ui.MainActivity;
+import com.moez.QKSMS.ui.base.QKActivity;
 import com.moez.QKSMS.ui.base.QKContentFragment;
+import com.moez.QKSMS.ui.messagelist.MessageListActivity;
 import com.moez.QKSMS.ui.view.AutoCompleteContactView;
 import com.moez.QKSMS.ui.view.ComposeView;
 import com.moez.QKSMS.ui.view.StarredContactsView;
@@ -42,8 +45,6 @@ public class ComposeFragment extends QKContentFragment implements ActivityLaunch
     public static final String FOCUS_RECIPIENTS = "recipients";
     public static final String FOCUS_REPLY = "reply";
 
-    private Context mContext;
-
     private AutoCompleteContactView mRecipients;
     private ComposeView mComposeView;
     private StarredContactsView mStarredContactsView;
@@ -67,8 +68,8 @@ public class ComposeFragment extends QKContentFragment implements ActivityLaunch
      * Returns a ComposeFragment, configured with the args. If possible, the given fragment
      * is used instead of creating a new ComposeFragment.
      *
-     * @param args A Bundle with options for configuring this fragment. See the ARG_ constants for
-     *             configuration options.
+     * @param args          A Bundle with options for configuring this fragment. See the ARG_ constants for
+     *                      configuration options.
      * @param reuseFragment A fragment that can be used instead of creating a new one.
      * @return the ComposeFragment, which may be recycled
      */
@@ -77,7 +78,7 @@ public class ComposeFragment extends QKContentFragment implements ActivityLaunch
 
         // Check if we can reuse the passed fragment.
         if (reuseFragment != null && reuseFragment instanceof ComposeFragment) {
-            f = (ComposeFragment)reuseFragment;
+            f = (ComposeFragment) reuseFragment;
         } else {
             f = new ComposeFragment();
         }
@@ -95,12 +96,6 @@ public class ComposeFragment extends QKContentFragment implements ActivityLaunch
     }
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        mContext = getActivity();
-    }
-
-    @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 
         View view = inflater.inflate(R.layout.fragment_compose, container, false);
@@ -110,6 +105,7 @@ public class ComposeFragment extends QKContentFragment implements ActivityLaunch
 
         view.findViewById(R.id.compose_view_stub).setVisibility(View.VISIBLE);
         mComposeView = (ComposeView) view.findViewById(R.id.compose_view);
+        mComposeView.onOpenConversation(null, null);
         mComposeView.setActivityLauncher(this);
         mComposeView.setRecipientProvider(this);
         mComposeView.setOnSendListener(this);
@@ -135,14 +131,14 @@ public class ComposeFragment extends QKContentFragment implements ActivityLaunch
     public void onSend(String[] recipients, String body) {
         long threadId = Utils.getOrCreateThreadId(mContext, recipients[0]);
         if (recipients.length == 1) {
-            ((MainActivity) mContext).setConversation(threadId);
+            MessageListActivity.launch(mContext, threadId, -1, null, true);
         } else {
             ((MainActivity) mContext).showMenu();
         }
     }
 
     @Override
-    protected void onContentOpened() {
+    public void onContentOpened() {
         setupInput();
     }
 
@@ -167,11 +163,40 @@ public class ComposeFragment extends QKContentFragment implements ActivityLaunch
     }
 
     @Override
-    protected void onContentClosing() {
+    public void onContentClosing() {
         // Clear the focus from this fragment.
         if (getActivity() != null && getActivity().getCurrentFocus() != null) {
             getActivity().getCurrentFocus().clearFocus();
         }
+    }
+
+    @Override
+    public void onContentClosed() {
+        super.onContentClosed();
+        if (mComposeView != null) {
+            mComposeView.saveDraft();
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (mComposeView != null) {
+            mComposeView.saveDraft();
+        }
+    }
+
+    @Override
+    public void onMenuChanging(float percentOpen) {
+
+    }
+
+    @Override
+    public void inflateToolbar(Menu menu, MenuInflater inflater, Context context) {
+        inflater.inflate(R.menu.compose, menu);
+        ((QKActivity) context).setTitle(R.string.title_compose);
+
+        super.onCreateOptionsMenu(menu, inflater);
     }
 
     /**

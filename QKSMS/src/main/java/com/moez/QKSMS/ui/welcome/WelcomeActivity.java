@@ -1,7 +1,5 @@
 package com.moez.QKSMS.ui.welcome;
 
-import android.animation.ArgbEvaluator;
-import android.animation.ValueAnimator;
 import android.app.Fragment;
 import android.content.SharedPreferences;
 import android.graphics.PorterDuff;
@@ -9,9 +7,10 @@ import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v4.view.ViewPager;
 import android.view.View;
-import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
 import com.moez.QKSMS.R;
+import com.moez.QKSMS.common.LiveViewManager;
+import com.moez.QKSMS.enums.QKPreference;
 import com.moez.QKSMS.ui.ThemeManager;
 import com.moez.QKSMS.ui.base.QKActivity;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
@@ -60,21 +59,10 @@ public class WelcomeActivity extends QKActivity implements ViewPager.OnPageChang
         BaseWelcomeFragment.setContext(this);
         mPager.setOnPageChangeListener(this);
         mPager.setAdapter(new WelcomePagerAdapter(getFragmentManager()));
-    }
 
-    public void setColor(int color) {
-        ValueAnimator colorAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), ThemeManager.getColor(), color);
-        colorAnimation.setDuration(ThemeManager.TRANSITION_LENGTH);
-        colorAnimation.setInterpolator(new DecelerateInterpolator());
-        colorAnimation.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator animation) {
-                mBackground.setBackgroundColor((Integer) animation.getAnimatedValue());
-            }
+        LiveViewManager.registerView(QKPreference.THEME, this, key -> {
+            mBackground.setBackgroundColor(ThemeManager.getColor());
         });
-        colorAnimation.start();
-
-        ThemeManager.setColour(color);
     }
 
     public void setColorBackground(int color) {
@@ -84,7 +72,7 @@ public class WelcomeActivity extends QKActivity implements ViewPager.OnPageChang
     public void tintIndicators(int color) {
         if (mIndicators != null) {
             for (ImageView indicator : mIndicators) {
-                indicator.setColorFilter(color, PorterDuff.Mode.MULTIPLY);
+                indicator.setColorFilter(color, PorterDuff.Mode.SRC_ATOP);
             }
         }
 
@@ -93,11 +81,11 @@ public class WelcomeActivity extends QKActivity implements ViewPager.OnPageChang
         }
 
         if (mPrevious != null) {
-            mPrevious.setColorFilter(color, PorterDuff.Mode.MULTIPLY);
+            mPrevious.setColorFilter(color, PorterDuff.Mode.SRC_ATOP);
         }
 
         if (mNext != null) {
-            mNext.setColorFilter(color, PorterDuff.Mode.MULTIPLY);
+            mNext.setColorFilter(color, PorterDuff.Mode.SRC_ATOP);
         }
     }
 
@@ -176,6 +164,6 @@ public class WelcomeActivity extends QKActivity implements ViewPager.OnPageChang
 
         SharedPreferences.Editor prefs = PreferenceManager.getDefaultSharedPreferences(this).edit();
         prefs.putBoolean(SettingsFragment.WELCOME_SEEN, true);
-        prefs.commit();
+        prefs.apply();
     }
 }

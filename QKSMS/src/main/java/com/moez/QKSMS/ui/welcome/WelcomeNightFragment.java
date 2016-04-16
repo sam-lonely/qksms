@@ -10,7 +10,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import com.moez.QKSMS.R;
-import com.moez.QKSMS.common.LiveViewManager;
 import com.moez.QKSMS.ui.ThemeManager;
 import com.moez.QKSMS.ui.settings.SettingsFragment;
 import com.moez.QKSMS.ui.view.QKTextView;
@@ -36,8 +35,6 @@ public class WelcomeNightFragment extends BaseWelcomeFragment implements BaseWel
 
         mContext.setFinished();
 
-        LiveViewManager.unregisterView(mNightHint);
-
         return view;
     }
 
@@ -59,18 +56,18 @@ public class WelcomeNightFragment extends BaseWelcomeFragment implements BaseWel
 
         if (mNightHint != null) {
             mNightHint.setTextColor(colorBackground);
-            mNightHint.getBackground().setColorFilter(colorAccent, PorterDuff.Mode.MULTIPLY);
+            mNightHint.getBackground().setColorFilter(colorAccent, PorterDuff.Mode.SRC_ATOP);
         }
     }
 
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.welcome_night_hint) {
-            boolean night = ThemeManager.getTheme() == ThemeManager.Theme.OFFWHITE;
+            boolean night = ThemeManager.getTheme() == ThemeManager.Theme.LIGHT;
 
             int backgroundColor = mContext.getResources().getColor(night ? R.color.grey_light_mega_ultra : R.color.grey_material);
             int newBackgroundColor = mContext.getResources().getColor(night ? R.color.grey_material : R.color.grey_light_mega_ultra);
-            ThemeManager.setTheme(night ? ThemeManager.Theme.GREY : ThemeManager.Theme.OFFWHITE);
+            ThemeManager.setTheme(night ? ThemeManager.Theme.DARK : ThemeManager.Theme.LIGHT);
 
             ValueAnimator colorAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), backgroundColor, newBackgroundColor);
             colorAnimation.setDuration(ThemeManager.TRANSITION_LENGTH);

@@ -43,7 +43,7 @@ public class RecipientIdCache {
             this.id = id;
             this.number = number;
         }
-    };
+    }
 
     static void init(Context context) {
         sInstance = new RecipientIdCache(context);
@@ -96,7 +96,7 @@ public class RecipientIdCache {
 
     public static List<Entry> getAddresses(String spaceSepIds) {
         synchronized (sInstance) {
-            List<Entry> numbers = new ArrayList<Entry>();
+            List<Entry> numbers = new ArrayList<>();
             String[] ids = spaceSepIds.split(" ");
             for (String id : ids) {
                 long longId;

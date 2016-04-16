@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="http://schemas.android.com/apk/res-auto">
-    <!--App name-->
-    <string name="app_name">QKSMS</string>
     <!--Slogan-->
     <string name="slogan">Love texting again.</string>
     <!--Text shown when a phone number cannot be found-->
@@ -103,11 +101,16 @@
     <string name="details_date_sent">Date sent</string>
     <!--Title for date received of a message in message details popup-->
     <string name="details_date_received">Date received</string>
+    <!--Title for rate snackbar-->
+    <string name="rate_title">Like QKSMS?</string>
+    <!--Title for rate button-->
+    <string name="rate_action">Rate</string>
 
     <string name="pref_category_appearance">Appearance</string>
     <string name="pref_category_summary_appearance">Themes, fonts, colors, avatars, and more</string>
     <string name="pref_category_general">General</string>
     <string name="pref_category_summary_general">Delivery, message sending, formatting</string>
+    <string name="pref_category_blocking">Message blocking</string>
     <string name="pref_category_notifications">Notifications</string>
     <string name="pref_category_summary_notifications">Sounds, LED, privacy</string>
     <string name="pref_category_mms">MMS</string>
@@ -116,15 +119,13 @@
     <string name="pref_category_summary_quickreply">QK Reply, popup options</string>
     <string name="pref_category_quickcompose">QK Compose</string>
     <string name="pref_category_summary_quickcompose">QK Compose, starred contacts</string>
-    <string name="pref_category_advanced">Advanced</string>
-    <string name="pref_category_summary_advanced">Advanced UI tweaks</string>
     <string name="pref_category_about">About</string>
     <string name="pref_category_summary_about">Version, changelog, authors, thanks</string>
 
-    <string name="pref_theme">Color scheme</string>
+    <string name="pref_theme">Theme color</string>
     <string name="pref_theme_summary_alt">Tap to change theme</string>
     <string name="pref_icon">Update QKSMS icon color</string>
-    <string name="pref_icon_summary">Update the QKSMS icon to match your color scheme</string>
+    <string name="pref_icon_summary">Update the QKSMS icon to match your theme color</string>
     <string name="pref_status_tint">Tinted status bar</string>
     <string name="pref_navigation_tint">Tinted navigation bar</string>
     <string name="pref_background">Background color</string>
@@ -154,6 +155,8 @@
     <string name="pref_sliding_tab">Sliding panel tab</string>
     <string name="pref_sliding_tab_summary">Sliding tab that allows you to quickly view your last conversation</string>
 
+    <string name="pref_sent_timestamps">Sent timestamps</string>
+    <string name="pref_sent_timestamps_summary">Show the timestamp for when a message was sent, not received</string>
     <string name="pref_compose_favorites">Starred contacts</string>
     <string name="pref_compose_summary_favorites">Show your starred contacts in the QK Compose window, making them only a tap away</string>
     <string name="pref_prox_sensor_call">Proximity sensor</string>
@@ -166,6 +169,12 @@
     <string name="pref_delivery_vibrate_summary">Vibrate on message delivery</string>
     <string name="pref_yappy">Yappy integration</string>
     <string name="pref_endlessjabber_summary">Enable full support for Yappy</string>
+    <string name="pref_blocked_conversations">Blocked conversations</string>
+    <string name="pref_blocked_conversations_summary">Long-press on a conversation and block to move to blocked inbox and stop notifications</string>
+    <string name="pref_block_future">Block future messages</string>
+    <string name="pref_block_future_summary">Add additional phone numbers to block</string>
+    <string name="pref_should_i_answer">Should I Answer? Integration</string>
+    <string name="pref_should_i_answer_summary">Automatically delete incoming messages from numbers which are blocked through Should I Answer?</string>
     <string name="pref_mobile_only">Mobile numbers</string>
     <string name="pref_mobile_only_summary">Only show mobile numbers in contact suggestions</string>
     <string name="pref_auto_emoji">Automatic emoji</string>
@@ -198,7 +207,7 @@
     <string name="pref_wake">Wake phone</string>
     <string name="pref_wake_summary">Turn your screen on when you receive a new message</string>
     <string name="pref_notifications_private">Private notifications</string>
-    <string name="pref_notifications_private_summary">Hide message text in notifications</string>
+    <string name="pref_notifications_private_summary">Tap to change what should be hidden in notfication</string>
     <string name="pref_ringtone">Notification sound</string>
     <string name="pref_ringtone_summary">Select a notification sound</string>
     <string name="pref_ticker">Show ticker</string>
@@ -207,6 +216,8 @@
     <string name="pref_vibration_summary">Vibrate when new messages are received</string>
     <string name="pref_notification_call">Call button</string>
     <string name="pref_notification_call_summary">Call the sender of a message right from the notification</string>
+    <string name="pref_dimiss_read">Mark as read</string>
+    <string name="pref_dismiss_read_summary">Mark message as read when notification is cleared</string>
 
     <string name="pref_delayed">Delayed messaging</string>
     <string name="pref_delayed_summary">Wait before sending your messages, so you have a chance to review them</string>
@@ -250,9 +261,12 @@
     <string name="pref_about_thanks_summary">Tap to view open-source contributors</string>
     <string name="pref_donate_title">Donate</string>
     <string name="pref_donate_summary">QKSMS is free. Help support us by donating!</string>
-
-    <string name="pref_show_all">Show all preferences</string>
-    <string name="pref_show_fewer">Show fewer preferences</string>
+    <string name="pref_about_gplus_title">Google+</string>
+    <string name="pref_about_gplus_summary">Join the QKSMS Beta Testing community on Google+</string>
+    <string name="pref_about_github_title">GitHub</string>
+    <string name="pref_about_github_summary">QKSMS is open source. Contribute and report issues on GitHub</string>
+    <string name="pref_about_crowdin_title">Crowdin</string>
+    <string name="pref_about_crowdin_summary">Join the QKSMS translation project on Crowdin</string>
 
     <!--Preference subcategory-->
     <string name="pref_subcat_theme">Theme</string>
@@ -287,22 +301,18 @@
     <!--$10 donaion product description-->
     <string name="product_description_donate_10">Buy me lunch</string>
 
-    <!--Settings screen title-->
     <string name="title_settings">Settings</string>
-    <!--Settings screen title-->
     <string name="title_search">Search</string>
-    <!--Compose screen title-->
     <string name="title_compose">Compose</string>
-    <!--Conversations screen title-->
     <string name="title_conversation_list">Conversations</string>
-    <!--Changelog screen title-->
+    <string name="title_blocked">Blocked</string>
     <string name="title_changelog">Changelog</string>
-    <!--QuickReply picker dialog title (shows up when you press reply from notification, but there are multiple senders)-->
     <string name="title_picker">New messages</string>
-    <!--Donate dialog title-->
     <string name="title_donate">Donate</string>
-    <!--QK Response dialog title-->
     <string name="title_qk_responses">QK Responses</string>
+    <string name="title_block_address">Block number</string>
+    <string name="title_unblock_address">Unblock number</string>
+    <string name="title_conversations_selected">%s selected</string>
 
     <!-- Menu shown in the context menu when long pressing on a message when the message contains
          one or more phone numbers and/or email addresses and the number or email is new to
@@ -332,13 +342,13 @@
     <!--Text for app restart confirmation dialog-->
     <string name="restart_message">These changes will take effect the next time QKSMS is opened</string>
     <!--Dialog title for asking if a user wants to delete a conversation-->
-    <string name="delete_conversation">Delete conversation</string>
+    <string name="delete_conversation">Delete conversations</string>
     <!--Dialog title for asking if a user wants to delete all failed messages-->
     <string name="delete_all_failed">Delete failed messages</string>
     <!--CDialog title for asking if a user wants to delete a conversation-->
-    <string name="delete_confirmation">Are you sure you would like to delete the conversation?</string>
+    <string name="delete_confirmation">Are you sure you would like to delete (%s) conversations?</string>
     <!--CDialog title for asking if a user wants to delete all failed messages-->
-    <string name="delete_all_failed_confirmation">Are you sure you would like to all failed messages?</string>
+    <string name="delete_all_failed_confirmation">Are you sure you would like to delete failed messages from (%s) conversations?</string>
     <!--(Unused) Dialog title shown if APNs have not been set-->
     <string name="apns_not_set">APNs not set</string>
     <!--(Unused) Dialog description shown if APNs have not been set-->
@@ -365,8 +375,12 @@
     <string name="mark_read">Mark as read</string>
     <!--Notification action to call the sender of a message-->
     <string name="call">Call</string>
+    <!-- Notification toast message  -->
+    <string name="notification_mute_on">Notifications enabled</string>
+    <string name="notification_mute_off">Notifications disabled</string>
     <!--Positive action button-->
     <string name="yes">Yes</string>
+    <string name="add">Add</string>
     <!--Positive action button-->
     <string name="save">Save</string>
     <!--Positive action button-->
@@ -404,14 +418,10 @@
     <!-- Word represents 'self' in a conversation -->
     <string name="me">Me</string>
 
-    <!-- Menu title for editing a message -->
     <string name="menu_edit">Edit</string>
-    <!-- Menu title for deleting undelivered messages or messages on
-         the SIM card. -->
     <string name="menu_delete_messages">Delete messages</string>
-    <!-- Menu title for locking a message -->
+    <string name="menu_delete_failed">Delete failed messages</string>
     <string name="menu_lock">Lock</string>
-    <!-- Menu title for unlocking a message -->
     <string name="menu_unlock">Unlock</string>
 
     <!-- When the user tries to view message details and some error occurs while
@@ -576,6 +586,8 @@
     <string name="dialog_conversation_details_last_message_date">Last message date</string>
     <string name="dialog_conversation_details_message_count">Message count</string>
     <string name="dialog_conversation_details_recipients">Recipients (%s)</string>
+    <string name="dialog_should_i_answer_title">Should I Answer? not installed</string>
+    <string name="dialog_should_i_answer_message">Would you like to download the app from Google Play now?</string>
 
     <!-- Title for audio file picker -->
     <string name="select_audio">Choose audio</string>
@@ -619,6 +631,9 @@
     <string name="toast_billing_not_available">Purchase requires Google Play Store (billing) on your Android</string>
     <!--Toast shown when Google Play Services is not available for purchasing a product-->
     <string name="toast_endlessjabber_not_installed">EndlessJabber is not installed, opening Google Play</string>
+    <string name="toast_changelog_error">Couldn\'t load the changelog. Please try again later</string>
+    <string name="toast_conversation_error">Couldn\'t open conversation</string>
+
     <!--Toast shown to thank user for donating-->
     <string name="thanks_1">Thank you for donating! You\'re my new best friend.</string>
     <!--Toast shown to thank user for donating-->
@@ -632,12 +647,21 @@
     <string name="menu_mute_conversation">Mute conversation</string>
     <!--Menu option to mute conversation-->
     <string name="menu_unmute_conversation">Unmute conversation</string>
-    <string name="menu_notification_settings">Notification settings</string>
+    <string name="menu_block_conversations">Block conversations</string>
+    <string name="menu_unblock_conversations">Unblock conversations</string>
+    <string name="menu_messages">Messages</string>
+    <string name="menu_blocked">Blocked</string>
+    <string name="menu_blocked_conversations">Blocked (%s new)</string>
+    <string name="menu_unblocked_conversations">Messages (%s new)</string>
+    <string name="menu_notifications">Notifications</string>
+    <string name="menu_notifications_off">Notifications off</string>
+    <string name="menu_notification_settings">Conversation settings</string>
     <string name="menu_view_details">View details</string>
     <string name="menu_mark_read">Mark read</string>
     <string name="menu_mark_unread">Mark unread</string>
     <string name="menu_delete_conversation">Delete conversation</string>
     <string name="menu_multi_select">Select conversation</string>
+    <string name="menu_done">Done</string>
     <string name="failed_message_title">Failed message options</string>
     <!--Toast shown to tell the user that they don't have a photo attachments app, and suggests that they download one-->
     <string name="attachment_app_not_found">Attachments app not found. Try installing a photo gallery app!</string>
@@ -712,15 +736,8 @@
     <string name="auto_select_failed">Try searching for your carrier\'s APN settings (MMSC, Port, and Proxy) and entering them in Settings > Advanced.</string>
     <string name="date_yesterday">Yesterday</string>
     <string name="date_just_now">Just now</string>
-
-    <string-array name="qksms_plus_about_feature_titles">
-        <item>Bonus theme colors</item>
-        <item>Delayed messaging</item>
-        <item>Custom notifications</item>
-        <item>Automatic night mode</item>
-        <item>Android Wear responses</item>
-        <item>And more for free!</item>
-    </string-array>
+    <string name="compose_loading_attachment">Loading attachment</string>
+    <string name="hint_no_messages">No messages yet.\nClick the + to send one!</string>
 
     <string-array name="resend_menu">
         <item>Resend</item>
@@ -736,18 +753,9 @@
     </string-array>
 
     <string-array name="background_titles">
-        <item>White</item>
-        <item>Off-white</item>
-        <item>Dark grey</item>
+        <item>Material Light</item>
+        <item>Material Dark</item>
         <item>Black</item>
-    </string-array>
-
-
-    <string-array name="background_values">
-        <item>white</item>
-        <item>offwhite</item>
-        <item>grey</item>
-        <item>black</item>
     </string-array>
 
     <string-array name="font_sizes">
@@ -760,7 +768,7 @@
     <string-array name="font_families">
         <item>Roboto Regular</item>
         <item>Roboto Condensed</item>
-        <item>Lato</item>
+        <item>System font</item>
     </string-array>
 
     <string-array name="font_weights">
@@ -796,10 +804,10 @@
         <item>Send message</item>
     </string-array>
 
-    <string-array name="enter_button_values">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
+    <string-array name="notification_private_options">
+        <item>Show all</item>
+        <item>Hide message</item>
+        <item>Hide message and sender</item>
     </string-array>
 
     <!-- Max MMS attachment sizes. I.e. will compress pictures that are larger than 300 KB down to
@@ -809,43 +817,5 @@
         <item>600 KB</item>
         <item>1 MB</item>
         <item>Unlimited</item>
-    </string-array>
-
-    <!-- DO NOT TRANSLATE -->
-    <string-array name="max_mms_attachment_size_values">
-        <item>300kb</item>
-        <item>600kb</item>
-        <item>1mb</item>
-        <item>unlimited</item>
-    </string-array>
-
-    <!-- DO NOT TRANSLATE -->
-    <string-array name="contributor_names">
-        <item>Jeremy Feinstein</item>
-        <item>Flavien Laurent</item>
-        <item>Evgeny Shishkin</item>
-        <item>Jacob Klinker</item>
-        <item>Jeff Gilfelt</item>
-        <item>Melnykov Oleksandr</item>
-    </string-array>
-
-    <!-- DO NOT TRANSLATE -->
-    <string-array name="contributor_githubs">
-        <item>github.com/jfeinstein10</item>
-        <item>github.com/flavienlaurent</item>
-        <item>github.com/johnkil</item>
-        <item>github.com/klinker41</item>
-        <item>github.com/jgilfelt</item>
-        <item>github.com/makovkastar</item>
-    </string-array>
-
-    <!-- DO NOT TRANSLATE -->
-    <string-array name="contributor_projects">
-        <item>SlidingMenu</item>
-        <item>colorpicker</item>
-        <item>Android-RobotoTextView</item>
-        <item>android-smsmms\nandroid-chips</item>
-        <item>SystemBarTint</item>
-        <item>FloatingActionButton</item>
     </string-array>
 </resources>

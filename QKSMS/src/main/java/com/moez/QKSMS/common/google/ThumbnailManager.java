@@ -81,7 +81,7 @@ public class ThumbnailManager extends BackgroundLoaderManager {
     public ThumbnailManager(final Context context) {
         super(context);
 
-        mThumbnailCache = new SimpleCache<Uri, Bitmap>(8, 16, 0.75f, true);
+        mThumbnailCache = new SimpleCache<>(8, 16, 0.75f, true);
         mContext = context;
 
         mEmptyImageBitmap = BitmapFactory.decodeResource(context.getResources(),
@@ -122,10 +122,10 @@ public class ThumbnailManager extends BackgroundLoaderManager {
 
         final Bitmap thumbnail = DEBUG_DISABLE_CACHE ? null : mThumbnailCache.get(uri);
 
-        final boolean thumbnailExists = (thumbnail != null);
+        final boolean thumbnailExists = thumbnail != null;
         final boolean taskExists = mPendingTaskUris.contains(uri);
         final boolean newTaskRequired = !thumbnailExists && !taskExists;
-        final boolean callbackRequired = (callback != null);
+        final boolean callbackRequired = callback != null;
 
         if (Log.isLoggable(LogTag.THUMBNAIL_CACHE, Log.DEBUG)) {
             Log.v(TAG, "getThumbnail mThumbnailCache.get for uri: " + uri + " thumbnail: " +
@@ -322,8 +322,8 @@ public class ThumbnailManager extends BackgroundLoaderManager {
             if (data != null) {
                 Options options = new Options();
                 options.inPreferredConfig = Config.ARGB_8888;
-                Bitmap bitmap = requestDecode(data.mData,
-                        data.mOffset, data.mData.length - data.mOffset, options);
+                Bitmap bitmap = requestDecode(data.getData(),
+                        data.getOffset(), data.getData().length - data.getOffset(), options);
                 if (bitmap == null) {
                     Log.w(TAG, "decode cached failed " + path);
                 }

@@ -22,6 +22,7 @@ import android.util.Log;
 
 import com.android.mms.transaction.MmsMessageSender;
 import com.google.android.mms.pdu_alt.PduHeaders;
+import com.moez.QKSMS.QKSMSAppBase;
 import com.moez.QKSMS.mmssms.Utils;
 import com.moez.QKSMS.LogTag;
 import com.moez.QKSMS.QKSMSApp;
@@ -607,7 +608,7 @@ public class Conversation {
     }
 
     private static long getOrCreateThreadId(Context context, ContactList list) {
-        HashSet<String> recipients = new HashSet<String>();
+        HashSet<String> recipients = new HashSet<>();
         Contact cacheContact = null;
         for (Contact c : list) {
             cacheContact = Contact.get(c.getNumber(), false);
@@ -756,12 +757,10 @@ public class Conversation {
      * @param deleteAll Delete the whole thread including locked messages
      * @param threadIds Collection of thread IDs of the conversations to be deleted
      */
-    public static void startDelete(ConversationQueryHandler handler, int token, boolean deleteAll,
-                                   Collection<Long> threadIds) {
+    public static void startDelete(ConversationQueryHandler handler, int token, boolean deleteAll, Collection<Long> threadIds) {
         synchronized (sDeletingThreadsLock) {
             if (DELETEDEBUG) {
-                Log.v(TAG, "Conversation startDelete sDeletingThreads: " +
-                        sDeletingThreads);
+                Log.v(TAG, "Conversation startDelete sDeletingThreads: " + sDeletingThreads);
             }
             if (sDeletingThreads) {
                 Log.e(TAG, "startDeleteAll already in the middle of a delete", new Exception());
@@ -802,7 +801,7 @@ public class Conversation {
             sDeletingThreads = true;
             String selection = deleteAll ? null : "locked=0";
 
-            QKSMSApp app = QKSMSApp.getApplication();
+            QKSMSAppBase app = QKSMSApp.getApplication();
             //app.getPduLoaderManager().clear();
             //app.getThumbnailManager().clear();
 
@@ -828,18 +827,11 @@ public class Conversation {
         @Override
         protected void onDeleteComplete(int token, Object cookie, int result) {
             if (token == mDeleteToken) {
-                // Test code
-//                try {
-//                    Thread.sleep(10000);
-//                } catch (InterruptedException e) {
-//                }
-
                 // release lock
                 synchronized (sDeletingThreadsLock) {
                     sDeletingThreads = false;
                     if (DELETEDEBUG) {
-                        Log.v(TAG, "Conversation onDeleteComplete sDeletingThreads: " +
-                                sDeletingThreads);
+                        Log.v(TAG, "Conversation onDeleteComplete sDeletingThreads: " + sDeletingThreads);
                     }
                     sDeletingThreadsLock.notifyAll();
                 }
@@ -1224,7 +1216,7 @@ public class Conversation {
 
         // Keep track of what threads are now on disk so we
         // can discard anything removed from the cache.
-        HashSet<Long> threadsOnDisk = new HashSet<Long>();
+        HashSet<Long> threadsOnDisk = new HashSet<>();
 
         // Query for all conversations.
         Cursor c = context.getContentResolver().query(sAllThreadsUri,

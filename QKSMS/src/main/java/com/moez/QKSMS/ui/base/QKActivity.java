@@ -1,12 +1,17 @@
 package com.moez.QKSMS.ui.base;
 
+import android.app.ProgressDialog;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.graphics.PorterDuff;
-import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
-import android.support.v7.app.ActionBarActivity;
+import android.preference.PreferenceManager;
+import android.support.annotation.StringRes;
+import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
@@ -15,31 +20,64 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.widget.ImageView;
+import android.widget.Toast;
+import com.android.volley.RequestQueue;
+import com.moez.QKSMS.QKSMSApp;
 import com.moez.QKSMS.R;
+import com.moez.QKSMS.common.DialogHelper;
+import com.moez.QKSMS.common.DonationManager;
+import com.moez.QKSMS.common.LiveViewManager;
+import com.moez.QKSMS.common.utils.ColorUtils;
+import com.moez.QKSMS.enums.QKPreference;
 import com.moez.QKSMS.ui.ThemeManager;
+import com.moez.QKSMS.ui.search.SearchFragment;
+import com.moez.QKSMS.ui.settings.SettingsActivity;
 import com.moez.QKSMS.ui.view.QKTextView;
 
 import java.util.ArrayList;
 
-public class QKActivity extends ActionBarActivity {
+public abstract class QKActivity extends AppCompatActivity {
     private final String TAG = "QKActivity";
 
     private Toolbar mToolbar;
     private QKTextView mTitle;
     private ImageView mOverflowButton;
     private Menu mMenu;
+    private ProgressDialog mProgressDialog;
+
+    protected Resources mRes;
+    protected SharedPreferences mPrefs;
+
+    private static boolean mStatusTintEnabled = true;
+    private static boolean mNavigationTintEnabled = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mRes = getResources();
+        getPrefs(); // set the preferences if they haven't been set. this method takes care of that logic for us
+
+        mProgressDialog = new ProgressDialog(this);
+        mProgressDialog.setIndeterminate(true);
+        mProgressDialog.setCancelable(false);
+
+        LiveViewManager.registerView(QKPreference.TINTED_STATUS, this, key -> {
+            mStatusTintEnabled = getBoolean(QKPreference.TINTED_STATUS) &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
+        });
+
+        LiveViewManager.registerView(QKPreference.TINTED_NAV, this, key -> {
+            mNavigationTintEnabled = getBoolean(QKPreference.TINTED_NAV) &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
+        });
     }
 
     /**
      * Reloads the toolbar and it's view references.
-     * <p/>
+     * <p>
      * This is called every time the content view of the activity is set, since the
      * toolbar is now a part of the activity layout.
-     * <p/>
+     * <p>
      * TODO: If someone ever wants to manage the Toolbar dynamically instead of keeping it in their
      * TODO  layout file, we can add an alternate way of setting the toolbar programmatically.
      */
@@ -49,41 +87,75 @@ public class QKActivity extends ActionBarActivity {
         if (mToolbar == null) {
             throw new RuntimeException("Toolbar not found in BaseActivity layout.");
         } else {
+            mToolbar.setPopupTheme(R.style.PopupTheme);
             mTitle = (QKTextView) mToolbar.findViewById(R.id.toolbar_title);
             setSupportActionBar(mToolbar);
         }
 
-        ThemeManager.loadThemeProperties(this);
+        LiveViewManager.registerView(QKPreference.THEME, this, key -> {
+            mToolbar.setBackgroundColor(ThemeManager.getColor());
+
+            if (mStatusTintEnabled) {
+                getWindow().setStatusBarColor(ColorUtils.darken(ThemeManager.getColor()));
+            }
+            if (mNavigationTintEnabled) {
+                getWindow().setNavigationBarColor(ColorUtils.darken(ThemeManager.getColor()));
+            }
+        });
+
+        LiveViewManager.registerView(QKPreference.BACKGROUND, this, key -> {
+            setTheme(getThemeRes());
+            switch (ThemeManager.getTheme()) {
+                case LIGHT:
+                    mToolbar.setPopupTheme(R.style.PopupThemeLight);
+                    break;
+
+                case DARK:
+                case BLACK:
+                    mToolbar.setPopupTheme(R.style.PopupTheme);
+                    break;
+            }
+            ((QKTextView) findViewById(R.id.toolbar_title)).setTextColor(ThemeManager.getTextOnColorPrimary());
+        });
+    }
+
+    protected void showBackButton(boolean show) {
+        getSupportActionBar().setDisplayHomeAsUpEnabled(show);
+    }
+
+    public void showProgressDialog() {
+        mProgressDialog.show();
+    }
+
+    public void hideProgressDialog() {
+        mProgressDialog.hide();
+    }
+
+    public SharedPreferences getPrefs() {
+        if (mPrefs == null) {
+            mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+        }
+        return mPrefs;
     }
 
     public void colorMenuIcons(Menu menu, int color) {
 
         // Toolbar navigation icon
-        Drawable navigationIcon = getToolbar().getNavigationIcon();
+        Drawable navigationIcon = mToolbar.getNavigationIcon();
         if (navigationIcon != null) {
-            navigationIcon.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY));
-            getToolbar().setNavigationIcon(navigationIcon);
+            navigationIcon.setColorFilter(color, PorterDuff.Mode.SRC_ATOP);
+            mToolbar.setNavigationIcon(navigationIcon);
         }
 
         // Overflow icon
         colorOverflowButtonWhenReady(color);
-
-        // Settings expansion
-        ArrayList<View> views = new ArrayList<>();
-        View decor = getWindow().getDecorView();
-        decor.findViewsWithText(views, getString(R.string.menu_show_all_prefs), View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION);
-        decor.findViewsWithText(views, getString(R.string.menu_show_fewer_prefs), View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION);
-        android.widget.TextView connected = !views.isEmpty() ? (android.widget.TextView) views.get(0) : null;
-        if (connected != null) {
-            connected.setTextColor(color);
-        }
 
         // Other icons
         for (int i = 0; i < menu.size(); i++) {
             MenuItem menuItem = menu.getItem(i);
             Drawable newIcon = menuItem.getIcon();
             if (newIcon != null) {
-                newIcon.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY));
+                newIcon.setColorFilter(color, PorterDuff.Mode.SRC_ATOP);
                 menuItem.setIcon(newIcon);
             }
         }
@@ -93,7 +165,7 @@ public class QKActivity extends ActionBarActivity {
         if (mOverflowButton != null) {
             // We already have the overflow button, so just color it.
             Drawable icon = mOverflowButton.getDrawable();
-            icon.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY));
+            icon.setColorFilter(color, PorterDuff.Mode.SRC_ATOP);
             // Have to clear the image drawable first or else it won't take effect
             mOverflowButton.setImageDrawable(null);
             mOverflowButton.setImageDrawable(icon);
@@ -132,12 +204,11 @@ public class QKActivity extends ActionBarActivity {
     }
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
+    public boolean onPrepareOptionsMenu(Menu menu) {
         // Save a reference to the menu so that we can quickly access menu icons later.
         mMenu = menu;
         colorMenuIcons(mMenu, ThemeManager.getTextOnColorPrimary());
-
-        return super.onCreateOptionsMenu(mMenu);
+        return true;
     }
 
     @Override
@@ -160,7 +231,7 @@ public class QKActivity extends ActionBarActivity {
 
     /**
      * Sets the title of the activity, displayed on the toolbar
-     * <p/>
+     * <p>
      * Make sure this is only called AFTER setContentView, or else the Toolbar
      * is likely not initialized yet and this method will do nothing
      *
@@ -175,13 +246,26 @@ public class QKActivity extends ActionBarActivity {
         }
     }
 
-    /**
-     * Returns the Toolbar for this activity.
-     *
-     * @return
-     */
-    protected Toolbar getToolbar() {
-        return mToolbar;
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.menu_settings:
+                startActivity(SettingsActivity.class);
+                return true;
+            case R.id.menu_changelog:
+                DialogHelper.showChangelog(this);
+                return true;
+            case R.id.menu_donate:
+                DonationManager.getInstance(this).showDonateDialog();
+                return true;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    public void startActivity(Class<?> cls) {
+        Intent intent = new Intent(this, cls);
+        startActivity(intent);
     }
 
     public boolean isScreenOn() {
@@ -191,5 +275,49 @@ public class QKActivity extends ActionBarActivity {
         } else {
             return powerManager.isScreenOn();
         }
+    }
+
+    protected int getThemeRes() {
+        switch (ThemeManager.getTheme()) {
+            case DARK:
+                return R.style.AppThemeDark;
+
+            case BLACK:
+                return R.style.AppThemeDarkAmoled;
+        }
+
+        return R.style.AppThemeLight;
+    }
+
+    public void makeToast(@StringRes int message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    public RequestQueue getRequestQueue() {
+        return ((QKSMSApp) getApplication()).getRequestQueue();
+    }
+
+    public boolean getBoolean(QKPreference preference) {
+        return getPrefs().getBoolean(preference.getKey(), (boolean) preference.getDefaultValue());
+    }
+
+    public void setBoolean(QKPreference preference, boolean newValue) {
+        getPrefs().edit().putBoolean(preference.getKey(), newValue).apply();
+    }
+
+    public int getInt(QKPreference preference) {
+        return getPrefs().getInt(preference.getKey(), (int) preference.getDefaultValue());
+    }
+
+    public void setInt(QKPreference preference, int newValue) {
+        getPrefs().edit().putInt(preference.getKey(), newValue).apply();
+    }
+
+    public String getString(QKPreference preference) {
+        return getPrefs().getString(preference.getKey(), (String) preference.getDefaultValue());
+    }
+
+    public void setString(QKPreference preference, String newValue) {
+        getPrefs().edit().putString(preference.getKey(), newValue).apply();
     }
 }
